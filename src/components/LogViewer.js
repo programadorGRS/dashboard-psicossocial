@@ -5,10 +5,6 @@ const LogViewer = () => {
   const [logs, setLogs] = useState([]);
   const [filter, setFilter] = useState({ type: '', user: '', startDate: '', endDate: '' });
   
-  useEffect(() => {
-    loadLogs();
-  }, []);
-  
   const loadLogs = () => {
     const { type, user, startDate, endDate } = filter;
     
@@ -24,6 +20,10 @@ const LogViewer = () => {
       setLogs(getLogs());
     }
   };
+  
+  useEffect(() => {
+    loadLogs();
+  }, [filter]);
   
   const handleFilterChange = (e) => {
     const { name, value } = e.target;

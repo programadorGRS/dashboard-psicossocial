@@ -6,25 +6,21 @@ import { getAuth } from './auth/auth';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
   
   useEffect(() => {
     // Verificar se o usuário já está autenticado
     const auth = getAuth();
     if (auth) {
       setIsAuthenticated(true);
-      setUser(auth);
     }
   }, []);
   
-  const handleLoginSuccess = (userData) => {
+  const handleLoginSuccess = () => {
     setIsAuthenticated(true);
-    setUser(userData);
   };
   
   const handleLogout = () => {
     setIsAuthenticated(false);
-    setUser(null);
   };
   
   return (
