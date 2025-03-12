@@ -1,6 +1,27 @@
 // src/utils/permanentLogger.js
 import { openDB } from 'idb';
 
+export const LOG_TYPES = {
+  INFO: 'info',
+  WARNING: 'warning',
+  ERROR: 'error',
+  UPDATE: 'update',
+  LOGIN: 'login',
+  LOGOUT: 'logout',
+  SYSTEM: 'system',
+  ACCESS: 'access',
+  SECURITY: 'security'
+};
+
+// Função para determinar nível de risco com base na média
+export const determinarNivel = (media) => {
+  if (media <= 2) return "Baixo";
+  if (media <= 2.5) return "Moderado Baixo";
+  if (media <= 3.5) return "Moderado";
+  if (media <= 4) return "Moderado Alto";
+  return "Alto";
+};
+
 class PermanentLogger {
   constructor() {
     this.dbPromise = this.initDatabase();
@@ -36,7 +57,10 @@ class PermanentLogger {
         user: auth.user || 'sistema',
         timestamp: new Date().toISOString(),
         userRole: auth.role || 'não autenticado',
-        clientInfo: auth.clientInfo || {}
+        clientInfo: {
+          ip: auth.clientInfo?.ip || 'não identificado',
+          navegador: navigator.userAgent
+        }
       };
 
       const db = await this.dbPromise;
@@ -45,6 +69,11 @@ class PermanentLogger {
       
       await store.add(logEntry);
       await tx.done;
+
+      // Log no console em ambiente de desenvolvimento
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[${type.toUpperCase()}] ${message}`, details || '');
+      }
 
       return logEntry;
     } catch (error) {
@@ -124,16 +153,22 @@ class PermanentLogger {
       const index = store.index('timestamp');
       const range = IDBKeyRange.upperBound(cutoffDate.toISOString());
 
-      const oldLogsCursor = await index.openCursor(range);
+      let deletedCount = 0;
+      const cursor = await index.openCursor(range);
 
-      while (oldLogsCursor) {
-        store.delete(oldLogsCursor.primaryKey);
-        await oldLogsCursor.continue();
+      while (cursor) {
+        store.delete(cursor.primaryKey);
+        deletedCount++;
+        await cursor.continue();
       }
 
       await tx.done;
+
+      console.log(`Logs antigos removidos: ${deletedCount}`);
+      return deletedCount;
     } catch (error) {
       console.error('Erro ao limpar logs antigos:', error);
+      return 0;
     }
   }
 }
