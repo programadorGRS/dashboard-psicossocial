@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getLogs, exportLogs, LOG_TYPES } from '../utils/permanentLogger';
+import { getLogs, exportLogs } from '../utils/permanentLogger';
 import { canAccessLogs } from '../auth/auth';
 
 const LogViewer = () => {
   const [logs, setLogs] = useState([]);
-  const [filter, setFilter] = useState({
+  const [filter] = useState({
     type: '',
     user: '',
     startDate: '',
@@ -13,7 +13,6 @@ const LogViewer = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const logsPerPage = 10;
 
-  // Move useCallback BEFORE any conditionals
   const loadLogs = useCallback(async () => {
     try {
       const fetchedLogs = await getLogs(filter);
@@ -23,15 +22,12 @@ const LogViewer = () => {
     }
   }, [filter]);
 
-  // Move useEffect BEFORE any conditionals
   useEffect(() => {
-    // Only load logs if the user has access
     if (canAccessLogs()) {
       loadLogs();
     }
   }, [loadLogs]);
 
-  // Now we can do the access check
   if (!canAccessLogs()) {
     return (
       <div className="bg-red-100 p-4 rounded text-red-800">
@@ -44,9 +40,6 @@ const LogViewer = () => {
   const indexOfLastLog = currentPage * logsPerPage;
   const indexOfFirstLog = indexOfLastLog - logsPerPage;
   const currentLogs = logs.slice(indexOfFirstLog, indexOfLastLog);
-
-  // Alterar página
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   // Exportar logs
   const handleExport = async () => {
