@@ -13,16 +13,7 @@ const LogViewer = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const logsPerPage = 10;
 
-  // Move the access check before hooks
-  if (!canAccessLogs()) {
-    return (
-      <div className="bg-red-100 p-4 rounded text-red-800">
-        Acesso negado. Apenas administradores podem visualizar logs.
-      </div>
-    );
-  }
-
-  // Use useCallback to memoize the load function
+  // Move useCallback BEFORE any conditionals
   const loadLogs = useCallback(async () => {
     try {
       const fetchedLogs = await getLogs(filter);
@@ -32,10 +23,22 @@ const LogViewer = () => {
     }
   }, [filter]);
 
-  // Use useEffect to load logs when filter changes
+  // Move useEffect BEFORE any conditionals
   useEffect(() => {
-    loadLogs();
+    // Only load logs if the user has access
+    if (canAccessLogs()) {
+      loadLogs();
+    }
   }, [loadLogs]);
+
+  // Now we can do the access check
+  if (!canAccessLogs()) {
+    return (
+      <div className="bg-red-100 p-4 rounded text-red-800">
+        Acesso negado. Apenas administradores podem visualizar logs.
+      </div>
+    );
+  }
 
   // Paginação
   const indexOfLastLog = currentPage * logsPerPage;
@@ -56,10 +59,8 @@ const LogViewer = () => {
     }
   };
 
-  // Resto do componente permanece igual
   return (
     <div className="bg-white shadow-md rounded-lg p-6">
-      {/* Conteúdo do componente */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold text-gray-800">Logs do Sistema</h2>
         <button 
@@ -70,8 +71,6 @@ const LogViewer = () => {
         </button>
       </div>
 
-      {/* Filtros e tabela de logs (código anterior) */}
-      
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-100">
