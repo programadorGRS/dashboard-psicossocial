@@ -1,5 +1,5 @@
 const _0x5a2c = {
-  "admin": "QEdyczIwMjVA",
+  "admin": "QEdyczIwMjVA", 
   "cliente": "Z3JzY2xpZW50ZQ=="
 };
 
@@ -10,7 +10,7 @@ const _0x3b7f = (x) => {
     return '';
   }
 };
-
+ 
 const _0x7d4e = (u, p) => {
   if (!u || !p) return false;
   if (!_0x5a2c[u]) return false;
@@ -18,15 +18,23 @@ const _0x7d4e = (u, p) => {
   return _0x3b7f(_0x5a2c[u]) === p;
 };
 
+const generateSessionId = () => {
+  return Date.now().toString(36) + Math.random().toString(36).substring(2);
+};
+
 export const login = (user, key) => {
   if (_0x7d4e(user, key)) {
+    const sessionId = generateSessionId();
+    
     const userData = {
       user,
       role: user === 'admin' ? 'administrador' : 'cliente',
-      loginTime: new Date().toISOString()
+      loginTime: new Date().toISOString(),
+      sessionId
     };
     
     localStorage.setItem('auth', JSON.stringify(userData));
+    
     return userData;
   }
   
@@ -43,6 +51,7 @@ export const getAuth = () => {
     const authData = localStorage.getItem('auth');
     return authData ? JSON.parse(authData) : null;
   } catch (error) {
+    console.error('Erro ao obter autenticação:', error);
     localStorage.removeItem('auth');
     return null;
   }
