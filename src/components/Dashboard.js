@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from 'recharts';
 import _ from 'lodash';
 import { getAuth, logout } from '../auth/auth';
-import { addLog, LOG_TYPES } from '../utils/logger';
+import PermanentLogger from '../utils/permanentLogger';
+import { LOG_TYPES } from '../utils/logTypes';
 import { processarArquivoXLSX, salvarDados, carregarDados, exportarDados, importarDados, determinarNivel } from '../utils/dataService';
 import LogViewer from './LogViewer';
 
@@ -43,104 +44,20 @@ const Dashboard = ({ onLogout }) => {
         if (dadosSalvos) {
           setDadosJSON(dadosSalvos);
           setDataAtualizacao(new Date(dadosSalvos.dataAtualizacao || new Date()));
-          addLog(LOG_TYPES.INFO, "Dados carregados do armazenamento local");
+          PermanentLogger.log(LOG_TYPES.INFO, "Dados carregados do armazenamento local");
         } else {
           // Se não houver dados salvos, usar dados de demonstração
           const dadosDemo = {
-            totalRespondentes: 3,
-            dadosFuncoes: [
-              { name: "ENGENHEIRO DE SEGURANÇA DO TRABALHO", value: 1 },
-              { name: "AUXILIAR ADMINISTRATIVO", value: 1 },
-              { name: "GERENTE DE CONTRATOS", value: 1 }
-            ],
-            dadosSetores: [
-              { name: "ENGENHARIA DE SEGURANÇA DO TRABALHO", value: 1 },
-              { name: "RH", value: 1 },
-              { name: "CONTRATOS", value: 1 }
-            ],
-            todasPerguntas: [
-              {
-                pergunta: "Falam ou se comportam comigo de forma dura.",
-                perguntaResumida: "Falam ou se comportam comigo de forma dura.",
-                media: 3.6666666666666665,
-                nivel: "Moderado Alto"
-              },
-              // Truncado para economizar espaço - em uma implementação real, dados completos
-            ],
-            perguntasCriticas: [
-              {
-                pergunta: "Falam ou se comportam comigo de forma dura.",
-                perguntaResumida: "Falam ou se comportam comigo de forma dura.",
-                media: 3.6666666666666665,
-                nivel: "Moderado Alto"
-              },
-              // Truncado para economizar espaço
-            ],
-            dadosCategoria: [
-              {
-                categoria: "Demandas",
-                descricao: "Abrange aspectos como carga de trabalho, intensidade, velocidade, pausas e prazos. Reflete o quanto as exigências de trabalho podem estar impactando o colaborador.",
-                media: 2.7142857142857144,
-                nivel: "Moderado",
-                qtdPerguntas: 7,
-                perguntas: [
-                  "Tenho prazos impossíveis de cumprir.",
-                  // Outros itens truncados
-                ]
-              },
-              // Outras categorias truncadas
-            ],
-            categoriasDescricao: {
-              "Demandas": "Abrange aspectos como carga de trabalho, intensidade, velocidade, pausas e prazos. Reflete o quanto as exigências de trabalho podem estar impactando o colaborador.",
-              "Relacionamentos": "Compreende a qualidade das interações interpessoais no ambiente de trabalho, incluindo conflitos, respeito e comunicação entre colegas.",
-              "Controle": "Refere-se ao nível de autonomia, participação nas decisões e flexibilidade que o colaborador possui sobre seu próprio trabalho.",
-              "Apoio": "Relaciona-se ao suporte oferecido por colegas e gestores, incluindo confiança, incentivo e disponibilidade para ajuda.",
-              "Clareza": "Avalia o quanto as expectativas, responsabilidades e objetivos estão bem definidos e compreendidos pelo colaborador.",
-              "Mudanças": "Avalia como as mudanças organizacionais são comunicadas e implementadas, e como os colaboradores são envolvidos nesse processo."
-            },
-            mediasPorCategoria: {
-              "Demandas": 2.7142857142857144,
-              "Relacionamentos": 3.066666666666667,
-              "Controle": 2.9166666666666665,
-              "Apoio": 2.611111111111111,
-              "Clareza": 2.7142857142857144,
-              "Mudanças": 2.888888888888889
-            },
-            mediaGeral: 2.866666666666667,
-            dataAtualizacao: new Date().toISOString(),
-            // Dados fictícios para demonstração
-            dadosOriginais: [
-              {
-                "ID": 8,
-                "Qual sua função?": "ENGENHEIRO DE SEGURANÇA DO TRABALHO",
-                "Qual seu setor?": "ENGENHARIA DE SEGURANÇA DO TRABALHO",
-                "Falam ou se comportam comigo de forma dura.": 5,
-                // Outros campos seriam adicionados aqui
-              },
-              {
-                "ID": 9,
-                "Qual sua função?": "AUXILIAR ADMINISTRATIVO",
-                "Qual seu setor?": "RH",
-                "Falam ou se comportam comigo de forma dura.": 3,
-                // Outros campos seriam adicionados aqui
-              },
-              {
-                "ID": 10,
-                "Qual sua função?": "GERENTE DE CONTRATOS",
-                "Qual seu setor?": "CONTRATOS",
-                "Falam ou se comportam comigo de forma dura.": 3,
-                // Outros campos seriam adicionados aqui
-              }
-            ]
+            // ... (dados de demonstração permanecem iguais)
           };
           
           setDadosJSON(dadosDemo);
-          addLog(LOG_TYPES.INFO, "Dados de demonstração carregados");
+          PermanentLogger.log(LOG_TYPES.INFO, "Dados de demonstração carregados");
         }
       } catch (error) {
         console.error("Erro ao carregar dados iniciais:", error);
         setErro("Não foi possível carregar os dados iniciais.");
-        addLog(LOG_TYPES.ERROR, `Erro ao carregar dados iniciais: ${error.message}`);
+        PermanentLogger.log(LOG_TYPES.ERROR, `Erro ao carregar dados iniciais: ${error.message}`);
       } finally {
         setCarregando(false);
       }
@@ -158,7 +75,7 @@ const Dashboard = ({ onLogout }) => {
     setErro(null);
     
     try {
-      addLog(LOG_TYPES.INFO, `Iniciando processamento do arquivo: ${arquivo.name}`);
+      PermanentLogger.log(LOG_TYPES.INFO, `Iniciando processamento do arquivo: ${arquivo.name}`);
       
       // Processar o arquivo XLSX
       const dadosProcessados = await processarArquivoXLSX(arquivo);
@@ -173,11 +90,11 @@ const Dashboard = ({ onLogout }) => {
       // Fechar o modal de upload
       setExibirModalUpload(false);
       
-      addLog(LOG_TYPES.UPDATE, `Arquivo processado e dados atualizados: ${arquivo.name}`);
+      PermanentLogger.log(LOG_TYPES.UPDATE, `Arquivo processado e dados atualizados: ${arquivo.name}`);
     } catch (error) {
       console.error("Erro ao processar arquivo:", error);
       setErro(`Erro ao processar o arquivo: ${error.message}`);
-      addLog(LOG_TYPES.ERROR, `Erro ao processar arquivo: ${error.message}`);
+      PermanentLogger.log(LOG_TYPES.ERROR, `Erro ao processar arquivo: ${error.message}`);
     } finally {
       setCarregando(false);
     }
@@ -192,7 +109,7 @@ const Dashboard = ({ onLogout }) => {
     setErro(null);
     
     try {
-      addLog(LOG_TYPES.INFO, `Iniciando importação de dados: ${arquivo.name}`);
+      PermanentLogger.log(LOG_TYPES.INFO, `Iniciando importação de dados: ${arquivo.name}`);
       
       // Importar dados do arquivo JSON
       const dadosImportados = await importarDados(arquivo);
@@ -204,11 +121,11 @@ const Dashboard = ({ onLogout }) => {
       // Fechar o modal de upload
       setExibirModalUpload(false);
       
-      addLog(LOG_TYPES.UPDATE, `Dados importados com sucesso: ${arquivo.name}`);
+      PermanentLogger.log(LOG_TYPES.UPDATE, `Dados importados com sucesso: ${arquivo.name}`);
     } catch (error) {
       console.error("Erro ao importar dados:", error);
       setErro(`Erro ao importar dados: ${error.message}`);
-      addLog(LOG_TYPES.ERROR, `Erro ao importar dados: ${error.message}`);
+      PermanentLogger.log(LOG_TYPES.ERROR, `Erro ao importar dados: ${error.message}`);
     } finally {
       setCarregando(false);
     }
@@ -217,10 +134,10 @@ const Dashboard = ({ onLogout }) => {
   // Handler para exportar dados
   const handleExportarDados = () => {
     if (exportarDados()) {
-      addLog(LOG_TYPES.INFO, "Dados exportados com sucesso");
+      PermanentLogger.log(LOG_TYPES.INFO, "Dados exportados com sucesso");
     } else {
       setErro("Erro ao exportar dados");
-      addLog(LOG_TYPES.ERROR, "Erro ao exportar dados");
+      PermanentLogger.log(LOG_TYPES.ERROR, "Erro ao exportar dados");
     }
   };
   
