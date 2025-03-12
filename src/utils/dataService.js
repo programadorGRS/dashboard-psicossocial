@@ -1,10 +1,19 @@
 // src/utils/dataService.js
 import * as XLSX from 'xlsx';
 import _ from 'lodash';
-import { addLog, LOG_TYPES, determinarNivel } from './permanentLogger';
+import { addLog, LOG_TYPES } from './permanentLogger';
 
 // Diretório onde os dados serão salvos
 const DATA_KEY = 'dashboardData';
+
+// Função para determinar nível de risco com base na média
+export const determinarNivel = (media) => {
+  if (media <= 2) return "Baixo";
+  if (media <= 2.5) return "Moderado Baixo";
+  if (media <= 3.5) return "Moderado";
+  if (media <= 4) return "Moderado Alto";
+  return "Alto";
+};
 
 // Função para processar o arquivo XLSX e gerar o JSON
 export const processarArquivoXLSX = async (arquivo) => {
@@ -221,7 +230,7 @@ export const salvarDados = async (dados) => {
   }
 };
 
-// Função para carregar dados - ATENÇÃO especial aqui
+// Função para carregar dados
 export const carregarDados = () => {
   try {
     const dados = localStorage.getItem(DATA_KEY);
