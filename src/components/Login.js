@@ -7,21 +7,19 @@ const Login = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setIsLoggingIn(true);
     
     try {
-      // Validação básica
       if (!user || !key) {
         setError('Preencha todos os campos');
         setIsLoggingIn(false);
         return;
       }
       
-      // Tenta realizar o login
-      const userData = login(user, key);
+      const userData = await login(user, key);
       
       if (userData) {
         onLoginSuccess(userData);
@@ -29,6 +27,7 @@ const Login = ({ onLoginSuccess }) => {
         setError('Usuário ou chave secreta inválidos');
       }
     } catch (error) {
+      console.error("Erro no login:", error);
       setError('Erro ao realizar login. Tente novamente.');
     } finally {
       setIsLoggingIn(false);

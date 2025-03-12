@@ -6,22 +6,40 @@ import { getAuth } from './auth/auth';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    // Verificar se o usuário já está autenticado
-    const auth = getAuth();
-    if (auth) {
-      setIsAuthenticated(true);
-    }
+    const checkAuth = () => {
+      const auth = getAuth();
+      setIsAuthenticated(!!auth);
+      setIsLoading(false);
+    };
+    
+    checkAuth();
+    
+    const interval = setInterval(checkAuth, 60000);
+    
+    return () => clearInterval(interval);
   }, []);
   
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = (userData) => {
     setIsAuthenticated(true);
   };
   
   const handleLogout = () => {
     setIsAuthenticated(false);
   };
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="text-center">
+          <h2 className="text-xl font-bold mb-2">Carregando...</h2>
+          <p className="text-gray-600">Verificando autenticação</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="App">
