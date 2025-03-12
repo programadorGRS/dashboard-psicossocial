@@ -173,4 +173,12 @@ class PermanentLogger {
   }
 }
 
-export default new PermanentLogger();
+const logger = new PermanentLogger();
+
+// Exportações para permitir importações diferentes
+export const addLog = (...args) => logger.log(...args);
+export const getLogs = (...args) => logger.getLogs(...args);
+export const exportLogs = (...args) => logger.exportLogs(...args);
+export const clearOldLogs = (...args) => logger.clearOldLogs(...args);
+
+export default logger;
