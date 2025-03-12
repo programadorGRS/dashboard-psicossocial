@@ -5,16 +5,33 @@ const Login = ({ onLoginSuccess }) => {
   const [user, setUser] = useState('');
   const [key, setKey] = useState('');
   const [error, setError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
+    setIsLoggingIn(true);
     
-    const userData = login(user, key);
-    if (userData) {
-      onLoginSuccess(userData);
-    } else {
-      setError('Usuário ou chave secreta inválidos');
+    try {
+      // Validação básica
+      if (!user || !key) {
+        setError('Preencha todos os campos');
+        setIsLoggingIn(false);
+        return;
+      }
+      
+      // Tenta realizar o login
+      const userData = login(user, key);
+      
+      if (userData) {
+        onLoginSuccess(userData);
+      } else {
+        setError('Usuário ou chave secreta inválidos');
+      }
+    } catch (error) {
+      setError('Erro ao realizar login. Tente novamente.');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
   
@@ -69,8 +86,9 @@ const Login = ({ onLoginSuccess }) => {
           <button
             type="submit"
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+            disabled={isLoggingIn}
           >
-            Entrar
+            {isLoggingIn ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
       </div>

@@ -1,16 +1,19 @@
 // src/auth/auth.js
 import { encrypt, decrypt } from '../utils/crypto';
-import PermanentLogger from '../utils/permanentLogger';
-
-// Chaves de ambiente
-const ADMIN_KEY = process.env.REACT_APP_ADMIN_KEY;
-const CLIENTE_KEY = process.env.REACT_APP_CLIENTE_KEY;
 
 // Função para verificar uma chave
 export const validateKey = (user, key) => {
   if (!user || !key) return false;
   
-  const validKey = user === 'admin' ? ADMIN_KEY : CLIENTE_KEY;
+  const adminKey = process.env.REACT_APP_ADMIN_KEY;
+  const clienteKey = process.env.REACT_APP_CLIENTE_KEY;
+  
+  // Verifica se as variáveis de ambiente estão definidas
+  if (!adminKey || !clienteKey) {
+    return false;
+  }
+  
+  const validKey = user === 'admin' ? adminKey : clienteKey;
   return key === validKey;
 };
 
@@ -28,7 +31,6 @@ const getClientInfo = async () => {
       navegador: navigator.userAgent
     };
   } catch (error) {
-    console.error('Erro ao obter informações do cliente:', error);
     return {
       ip: 'Não identificado',
       cidade: 'Não identificado',
@@ -55,48 +57,14 @@ export const login = async (user, key) => {
     // Salvar dados de autenticação no localStorage
     localStorage.setItem('auth', JSON.stringify(userData));
     
-    // Registrar login permanente
-    await PermanentLogger.log(
-      'login', 
-      `Usuário ${user} realizou login com sucesso`, 
-      { 
-        role: userData.role,
-        clientInfo: {
-          ip: clientInfo.ip,
-          cidade: clientInfo.cidade,
-          pais: clientInfo.pais
-        }
-      }
-    );
-    
     return userData;
   }
-  
-  // Registrar tentativa de login falha
-  await PermanentLogger.log(
-    'error', 
-    `Tentativa de login falha para usuário: ${user}`,
-    { attemptedUser: user }
-  );
   
   return null;
 };
 
 // Função para logout
 export const logout = async () => {
-  const auth = getAuth();
-  
-  if (auth) {
-    await PermanentLogger.log(
-      'logout', 
-      `Usuário ${auth.user} realizou logout`,
-      { 
-        role: auth.role,
-        loginDuration: calculateLoginDuration(auth.loginTime)
-      }
-    );
-  }
-  
   localStorage.removeItem('auth');
   return true;
 };
@@ -128,15 +96,20 @@ export const validateSession = () => {
     
     return isValid && sessionDuration < 8;
   } catch (error) {
-    console.error('Erro na validação da sessão:', error);
     return false;
   }
 };
 
 // Verificar se o usuário está autenticado
 export const getAuth = () => {
-  const authData = localStorage.getItem('auth');
-  return authData ? JSON.parse(authData) : null;
+  try {
+    const authData = localStorage.getItem('auth');
+    return authData ? JSON.parse(authData) : null;
+  } catch (error) {
+    // Em caso de erro no parse, limpar o auth corrompido
+    localStorage.removeItem('auth');
+    return null;
+  }
 };
 
 // Verificar se o usuário é administrador
@@ -172,7 +145,6 @@ export const renewSession = async () => {
       
       return newUserData;
     } catch (error) {
-      console.error('Erro ao renovar sessão:', error);
       return null;
     }
   }
