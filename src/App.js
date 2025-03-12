@@ -1,0 +1,41 @@
+import React, { useState, useEffect } from 'react';
+import './App.css';
+import Dashboard from './components/Dashboard';
+import Login from './components/Login';
+import { getAuth } from './auth/auth';
+
+function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
+  
+  useEffect(() => {
+    // Verificar se o usuário já está autenticado
+    const auth = getAuth();
+    if (auth) {
+      setIsAuthenticated(true);
+      setUser(auth);
+    }
+  }, []);
+  
+  const handleLoginSuccess = (userData) => {
+    setIsAuthenticated(true);
+    setUser(userData);
+  };
+  
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUser(null);
+  };
+  
+  return (
+    <div className="App">
+      {isAuthenticated ? (
+        <Dashboard onLogout={handleLogout} />
+      ) : (
+        <Login onLoginSuccess={handleLoginSuccess} />
+      )}
+    </div>
+  );
+}
+
+export default App;
