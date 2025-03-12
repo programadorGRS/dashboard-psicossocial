@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getLogs, getFilteredLogs, exportLogs, LOG_TYPES } from '../utils/logger';
 
 const LogViewer = () => {
   const [logs, setLogs] = useState([]);
   const [filter, setFilter] = useState({ type: '', user: '', startDate: '', endDate: '' });
   
-  const loadLogs = () => {
+  const loadLogs = useCallback(() => {
     const { type, user, startDate, endDate } = filter;
     
     if (type || user || startDate || endDate) {
@@ -19,11 +19,11 @@ const LogViewer = () => {
     } else {
       setLogs(getLogs());
     }
-  };
+  }, [filter]);
   
   useEffect(() => {
     loadLogs();
-  }, [filter]);
+  }, [loadLogs]);
   
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
