@@ -1,9 +1,19 @@
+// src/utils/permanentLogger.js
+import { openDB } from 'idb';
 import * as XLSX from 'xlsx';
 import _ from 'lodash';
-import { addLog, LOG_TYPES } from './logger';
 
-// Diretório onde os dados serão salvos
-const DATA_KEY = 'dashboardData';
+export const LOG_TYPES = {
+  INFO: 'info',
+  WARNING: 'warning',
+  ERROR: 'error',
+  UPDATE: 'update',
+  LOGIN: 'login',
+  LOGOUT: 'logout',
+  SYSTEM: 'system',
+  ACCESS: 'access',
+  SECURITY: 'security'
+};
 
 // Função para determinar nível de risco com base na média
 export const determinarNivel = (media) => {
@@ -12,6 +22,160 @@ export const determinarNivel = (media) => {
   if (media <= 3.5) return "Moderado";
   if (media <= 4) return "Moderado Alto";
   return "Alto";
+};
+
+export const addLog = async (type, message, details = null) => {
+  try {
+    // Obter informações do usuário autenticado
+    const auth = JSON.parse(localStorage.getItem('auth') || '{}');
+    
+    // Abrir banco de dados
+    const db = await openDB('DashboardLogsDB', 1, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains('logs')) {
+          const store = db.createObjectStore('logs', { 
+            keyPath: 'id', 
+            autoIncrement: true 
+          });
+          
+          // Criar índices para facilitar busca
+          store.createIndex('type', 'type', { unique: false });
+          store.createIndex('user', 'user', { unique: false });
+          store.createIndex('timestamp', 'timestamp', { unique: false });
+        }
+      }
+    });
+
+    // Preparar entrada de log
+    const logEntry = {
+      type,
+      message,
+      details: details ? JSON.stringify(details) : null,
+      user: auth.user || 'sistema',
+      role: auth.role || 'não autenticado',
+      timestamp: new Date().toISOString(),
+      clientInfo: {
+        ip: auth.clientInfo?.ip || 'não identificado',
+        navegador: navigator.userAgent
+      }
+    };
+
+    // Iniciar transação de escrita
+    const tx = db.transaction('logs', 'readwrite');
+    await tx.objectStore('logs').add(logEntry);
+    await tx.done;
+
+    // Log no console em ambiente de desenvolvimento
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[${type.toUpperCase()}] ${message}`, details || '');
+    }
+
+    return logEntry;
+  } catch (error) {
+    console.error('Erro ao adicionar log:', error);
+    return null;
+  }
+};
+
+// Função para recuperar logs
+export const getLogs = async (filters = {}) => {
+  try {
+    const db = await openDB('DashboardLogsDB', 1);
+    const tx = db.transaction('logs', 'readonly');
+    const store = tx.objectStore('logs');
+
+    let logs = await store.getAll();
+
+    // Aplicar filtros
+    if (filters.type) {
+      logs = logs.filter(log => log.type === filters.type);
+    }
+
+    if (filters.user) {
+      logs = logs.filter(log => log.user === filters.user);
+    }
+
+    if (filters.startDate) {
+      const start = new Date(filters.startDate).getTime();
+      logs = logs.filter(log => new Date(log.timestamp).getTime() >= start);
+    }
+
+    if (filters.endDate) {
+      const end = new Date(filters.endDate).getTime();
+      logs = logs.filter(log => new Date(log.timestamp).getTime() <= end);
+    }
+
+    // Ordenar por timestamp decrescente
+    return logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  } catch (error) {
+    console.error('Erro ao recuperar logs:', error);
+    return [];
+  }
+};
+
+// Função para exportar logs
+export const exportLogs = async () => {
+  try {
+    const logs = await getLogs();
+    const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `logs_dashboard_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 0);
+
+    await addLog(LOG_TYPES.SYSTEM, 'Logs exportados com sucesso');
+
+    return true;
+  } catch (error) {
+    console.error('Erro ao exportar logs:', error);
+    await addLog(LOG_TYPES.ERROR, `Erro ao exportar logs: ${error.message}`);
+    return false;
+  }
+};
+
+// Função para limpar logs antigos
+export const clearOldLogs = async (daysToKeep = 90) => {
+  try {
+    const db = await openDB('DashboardLogsDB', 1);
+    const tx = db.transaction('logs', 'readwrite');
+    const store = tx.objectStore('logs');
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+
+    const index = store.index('timestamp');
+    const range = IDBKeyRange.upperBound(cutoffDate.toISOString());
+
+    let deletedCount = 0;
+    const cursor = await index.openCursor(range);
+
+    while (cursor) {
+      store.delete(cursor.primaryKey);
+      deletedCount++;
+      await cursor.continue();
+    }
+
+    await tx.done;
+
+    await addLog(LOG_TYPES.SYSTEM, `Logs antigos removidos`, {
+      diasMantidos: daysToKeep,
+      logsExcluidos: deletedCount
+    });
+
+    return deletedCount;
+  } catch (error) {
+    console.error('Erro ao limpar logs antigos:', error);
+    await addLog(LOG_TYPES.ERROR, `Erro ao limpar logs antigos: ${error.message}`);
+    return 0;
+  }
 };
 
 // Função para processar o arquivo XLSX e gerar o JSON
@@ -170,11 +334,11 @@ export const processarArquivoXLSX = async (arquivo) => {
             mediaGeral,
             dataAtualizacao: new Date().toISOString(),
             nomeArquivo: arquivo.name,
-            dadosOriginais: jsonData  // IMPORTANTE: Adicionado para preservar dados originais
+            dadosOriginais: jsonData
           };
           
           // Registrar log de processamento bem-sucedido
-          addLog(
+          await addLog(
             LOG_TYPES.UPDATE, 
             `Arquivo processado com sucesso: ${arquivo.name}`, 
             {
@@ -186,141 +350,20 @@ export const processarArquivoXLSX = async (arquivo) => {
           
           resolve(dadosProcessados);
         } catch (error) {
-          addLog(LOG_TYPES.ERROR, `Erro ao processar arquivo: ${error.message}`);
+          await addLog(LOG_TYPES.ERROR, `Erro ao processar arquivo: ${error.message}`);
           reject(error);
         }
       };
       
-      reader.onerror = (error) => {
-        addLog(LOG_TYPES.ERROR, `Erro ao ler arquivo: ${error}`);
+      reader.onerror = async (error) => {
+        await addLog(LOG_TYPES.ERROR, `Erro ao ler arquivo: ${error}`);
         reject(new Error("Erro ao ler o arquivo."));
       };
       
       reader.readAsArrayBuffer(arquivo);
     });
   } catch (error) {
-    addLog(LOG_TYPES.ERROR, `Erro no processamento: ${error.message}`);
+    await addLog(LOG_TYPES.ERROR, `Erro no processamento: ${error.message}`);
     throw error;
-  }
-};
-
-// Função para salvar dados
-export const salvarDados = (dados) => {
-  try {
-    localStorage.setItem(DATA_KEY, JSON.stringify(dados));
-    
-    // Criar uma cópia também em um arquivo JSON para persistência adicional
-    const dadosJSON = JSON.stringify(dados);
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(dadosJSON);
-    
-    // Criar link para download automático
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "dashboard_dados.json");
-    document.body.appendChild(downloadAnchorNode); // necessário para Firefox
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
-    
-    addLog(LOG_TYPES.INFO, "Dados salvos com sucesso");
-    return true;
-  } catch (error) {
-    addLog(LOG_TYPES.ERROR, `Erro ao salvar dados: ${error.message}`);
-    return false;
-  }
-};
-
-// Função para carregar dados
-export const carregarDados = () => {
-  try {
-    const dados = localStorage.getItem(DATA_KEY);
-    return dados ? JSON.parse(dados) : null;
-  } catch (error) {
-    addLog(LOG_TYPES.ERROR, `Erro ao carregar dados: ${error.message}`);
-    return null;
-  }
-};
-
-// Função para importar dados de um arquivo
-export const importarDados = (arquivo) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const conteudo = e.target.result;
-        const dados = JSON.parse(conteudo);
-        
-        // Validar estrutura básica dos dados
-        if (!dados.totalRespondentes || !dados.mediaGeral || !dados.todasPerguntas) {
-          throw new Error("Arquivo JSON inválido ou incompatível.");
-        }
-        
-        // Atualizar a data de importação
-        dados.dataAtualizacao = new Date().toISOString();
-        
-        // Salvar os dados
-        localStorage.setItem(DATA_KEY, JSON.stringify(dados));
-        
-        addLog(
-          LOG_TYPES.UPDATE, 
-          `Dados importados com sucesso de: ${arquivo.name}`, 
-          {
-            totalRespondentes: dados.totalRespondentes,
-            dataOriginal: dados.dataAtualizacao
-          }
-        );
-        
-        resolve(dados);
-      } catch (error) {
-        addLog(LOG_TYPES.ERROR, `Erro ao importar dados: ${error.message}`);
-        reject(error);
-      }
-    };
-    
-    reader.onerror = () => {
-      reject(new Error("Erro ao ler o arquivo."));
-    };
-    
-    reader.readAsText(arquivo);
-  });
-};
-
-// Função para exportar dados atuais
-export const exportarDados = () => {
-  try {
-    const dados = localStorage.getItem(DATA_KEY);
-    
-    if (!dados) {
-      throw new Error("Nenhum dado disponível para exportação.");
-    }
-    
-    // Criar nome de arquivo com data atual
-    const date = new Date().toISOString().split('T')[0];
-    const filename = `dashboard_dados_${date}.json`;
-    
-    // Criar blob com dados
-    const blob = new Blob([dados], { type: 'application/json' });
-    
-    // Criar URL para download
-    const url = URL.createObjectURL(blob);
-    
-    // Criar link de download
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    
-    // Limpar
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 0);
-    
-    addLog(LOG_TYPES.INFO, `Dados exportados com sucesso: ${filename}`);
-    return true;
-  } catch (error) {
-    addLog(LOG_TYPES.ERROR, `Erro ao exportar dados: ${error.message}`);
-    return false;
   }
 };
