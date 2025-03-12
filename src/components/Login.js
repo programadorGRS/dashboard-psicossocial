@@ -7,7 +7,7 @@ const Login = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
     setIsLoggingIn(true);
@@ -19,7 +19,7 @@ const Login = ({ onLoginSuccess }) => {
         return;
       }
       
-      const userData = await login(user, key);
+      const userData = login(user, key);
       
       if (userData) {
         onLoginSuccess(userData);

@@ -1,28 +1,25 @@
-const VALID_HASHES = {
-  "admin": "e14135620705279bad1fb4d1d1759258d8a8150b04ea22e5f69ba934ab1b1f2c",
-  "cliente": "f27566cc46fbedf5228eff30250b0c7fdf5e91fcdb627eeb9a5aa1c97bc99036"
+const _0x5a2c = {
+  "admin": "QEdyczIwMjVA",
+  "cliente": "Z3JzY2xpZW50ZQ=="
 };
 
-const hashString = async (str) => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(str);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
-};
-
-export const validateKey = async (user, key) => {
-  if (!user || !key || !VALID_HASHES[user]) {
-    return false;
+const _0x3b7f = (x) => {
+  try {
+    return atob(x);
+  } catch(e) {
+    return '';
   }
-  
-  const keyHash = await hashString(key);
-  return keyHash === VALID_HASHES[user];
 };
 
-export const login = async (user, key) => {
-  if (await validateKey(user, key)) {
+const _0x7d4e = (u, p) => {
+  if (!u || !p) return false;
+  if (!_0x5a2c[u]) return false;
+  
+  return _0x3b7f(_0x5a2c[u]) === p;
+};
+
+export const login = (user, key) => {
+  if (_0x7d4e(user, key)) {
     const userData = {
       user,
       role: user === 'admin' ? 'administrador' : 'cliente',
