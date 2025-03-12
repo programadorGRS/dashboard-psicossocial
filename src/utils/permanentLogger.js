@@ -7,37 +7,7 @@ export const LOG_TYPES = {
   LOGOUT: 'logout'
 };
 
-// Inicializa o banco de dados IndexedDB
-const initDB = () => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('DashboardLogsDB', 1);
-    
-    request.onerror = (event) => {
-      console.error('Erro ao abrir banco de dados:', event);
-      reject(event);
-    };
-    
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains('logs')) {
-        const store = db.createObjectStore('logs', { 
-          keyPath: 'id', 
-          autoIncrement: true 
-        });
-        store.createIndex('timestamp', 'timestamp', { unique: false });
-        store.createIndex('type', 'type', { unique: false });
-        store.createIndex('user', 'user', { unique: false });
-      }
-    };
-    
-    request.onsuccess = (event) => {
-      resolve(event.target.result);
-    };
-  });
-};
-
-// Adiciona um log no IndexedDB
-export const addLog = async (type, message, details = null) => {
+export const log = async (type, message, details = null) => {
   try {
     const auth = JSON.parse(localStorage.getItem('auth') || '{}');
     
@@ -49,15 +19,13 @@ export const addLog = async (type, message, details = null) => {
       timestamp: new Date().toISOString()
     };
     
-    const db = await initDB();
-    const tx = db.transaction('logs', 'readwrite');
-    const store = tx.objectStore('logs');
-    
-    await store.add(logEntry);
-    
-    // Salva também no localStorage como backup
     const logs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
     logs.push(logEntry);
+    
+    if (logs.length > 500) {
+      logs.splice(0, logs.length - 500);
+    }
+    
     localStorage.setItem('systemLogs', JSON.stringify(logs));
     
     if (process.env.NODE_ENV === 'development') {
@@ -71,42 +39,19 @@ export const addLog = async (type, message, details = null) => {
   }
 };
 
-// Obtém todos os logs
-export const getLogs = async () => {
+export const getLogs = () => {
   try {
-    const db = await initDB();
-    const tx = db.transaction('logs', 'readonly');
-    const store = tx.objectStore('logs');
-    
-    return new Promise((resolve, reject) => {
-      const request = store.getAll();
-      
-      request.onsuccess = () => {
-        const logs = request.result;
-        resolve(logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
-      };
-      
-      request.onerror = (event) => {
-        console.error('Erro ao obter logs:', event);
-        
-        // Fallback para localStorage
-        const localLogs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
-        resolve(localLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)));
-      };
-    });
+    const logs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
+    return logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   } catch (error) {
-    console.error('Erro ao obter logs do IndexedDB:', error);
-    
-    // Fallback para localStorage - CORRIGIDO: Removido parêntese extra
-    const localLogs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
-    return localLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    console.error('Erro ao obter logs:', error);
+    return [];
   }
 };
 
-// Exporta logs para um arquivo
-export const exportLogs = async () => {
+export const exportLogs = () => {
   try {
-    const logs = await getLogs();
+    const logs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
     
     const date = new Date().toISOString().split('T')[0];
     const filename = `logs_sistema_${date}.json`;
@@ -125,7 +70,7 @@ export const exportLogs = async () => {
       URL.revokeObjectURL(url);
     }, 0);
     
-    await addLog(LOG_TYPES.INFO, `Logs exportados para ${filename}`);
+    log(LOG_TYPES.INFO, `Logs exportados para ${filename}`);
     return true;
   } catch (error) {
     console.error('Erro ao exportar logs:', error);
@@ -133,27 +78,41 @@ export const exportLogs = async () => {
   }
 };
 
-// Importa logs de um arquivo
 export const importLogs = async (file) => {
   try {
     const text = await file.text();
-    const logs = JSON.parse(text);
+    const logsFromFile = JSON.parse(text);
     
-    const db = await initDB();
-    const tx = db.transaction('logs', 'readwrite');
-    const store = tx.objectStore('logs');
+    const currentLogs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
     
-    // Adiciona logs um por um
-    for (const log of logs) {
-      // Remove ID para evitar conflitos
-      const { id, ...logData } = log;
-      await store.add(logData);
+    const existingIds = new Set(currentLogs.map(log => log.id));
+    const newLogs = logsFromFile.filter(log => !existingIds.has(log.id));
+    
+    const mergedLogs = [...currentLogs, ...newLogs];
+    
+    if (mergedLogs.length > 5000) {
+      mergedLogs.splice(0, mergedLogs.length - 5000);
     }
     
-    await addLog(LOG_TYPES.INFO, `${logs.length} logs importados de ${file.name}`);
+    localStorage.setItem('systemLogs', JSON.stringify(mergedLogs));
+    
+    log(LOG_TYPES.INFO, `${newLogs.length} logs importados de ${file.name}`);
     return true;
   } catch (error) {
     console.error('Erro ao importar logs:', error);
     return false;
   }
 };
+
+export const addLog = log;
+
+const logger = {
+  log,
+  addLog,
+  getLogs,
+  exportLogs,
+  importLogs,
+  LOG_TYPES
+};
+
+export default logger;
