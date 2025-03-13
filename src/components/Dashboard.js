@@ -169,16 +169,35 @@ const Dashboard = ({ onLogout }) => {
   
   if (!dadosJSON) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="text-center">
-          <h2 className="text-xl font-bold mb-4">Sem dados disponíveis</h2>
-          <p>Carregue um arquivo XLSX com os dados do mapeamento psicossocial</p>
-          <button 
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            onClick={() => setExibirModalUpload(true)}
-          >
-            Carregar Arquivo
-          </button>
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md text-center">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Dashboard Psicossocial</h2>
+          <p className="text-gray-600 mb-6">Carregue uma planilha XLSX para iniciar a análise</p>
+          
+          <div className="mb-6">
+            <label 
+              htmlFor="upload-xlsx" 
+              className="block w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 cursor-pointer"
+            >
+              Carregar Planilha
+              <input 
+                id="upload-xlsx"
+                type="file" 
+                accept=".xlsx, .xls" 
+                onChange={handleUploadArquivo}
+                className="hidden"
+              />
+            </label>
+          </div>
+          
+          <div className="text-sm text-gray-500">
+            <p className="mb-2">Formato esperado da planilha:</p>
+            <ul className="list-disc list-inside text-left inline-block text-gray-600">
+              <li>Coluna "Qual sua função?"</li>
+              <li>Coluna "Qual seu setor?"</li>
+              <li>Colunas com perguntas de avaliação</li>
+            </ul>
+          </div>
         </div>
       </div>
     );
