@@ -16,6 +16,7 @@ const Dashboard = ({ onLogout }) => {
   const [dataAtualizacao, setDataAtualizacao] = useState(null);
   const [exibirModalUpload, setExibirModalUpload] = useState(false);
   const [usuario, setUsuario] = useState(null);
+  const [activeTab, setActiveTab] = useState('setor');
   
   useEffect(() => {
     const auth = getAuth();
