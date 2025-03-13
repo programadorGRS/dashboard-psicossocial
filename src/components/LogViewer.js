@@ -66,7 +66,10 @@ const LogViewer = () => {
   
   const handleExport = async () => {
     try {
-      await exportLogs();
+      const result = await exportLogs();
+      if (!result) {
+        alert('Erro ao exportar logs.');
+      }
     } catch (error) {
       console.error('Erro ao exportar logs:', error);
       alert('Erro ao exportar logs.');
@@ -78,9 +81,13 @@ const LogViewer = () => {
     if (!file) return;
     
     try {
-      await importLogs(file);
-      await loadLogs();
-      alert('Logs importados com sucesso!');
+      const result = await importLogs(file);
+      if (result) {
+        await loadLogs();
+        alert('Logs importados com sucesso!');
+      } else {
+        alert('Erro ao importar logs.');
+      }
     } catch (error) {
       console.error('Erro ao importar logs:', error);
       alert('Erro ao importar logs.');

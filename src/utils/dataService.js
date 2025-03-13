@@ -3,9 +3,6 @@ import * as XLSX from 'xlsx';
 import _ from 'lodash';
 import { addLog, LOG_TYPES } from './permanentLogger';
 
-// Diretório onde os dados serão salvos
-const DATA_KEY = 'dashboardData';
-
 // Função para determinar nível de risco com base na média
 export const determinarNivel = (media) => {
   if (media <= 2) return "Baixo";
@@ -208,35 +205,63 @@ export const processarArquivoXLSX = async (arquivo) => {
 // Função para salvar dados
 export const salvarDados = async (dados) => {
   try {
-    localStorage.setItem(DATA_KEY, JSON.stringify(dados));
+    // Salvar no servidor
+    const response = await fetch('/api/dashboard-data', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(dados),
+    });
     
-    // Criar uma cópia também em um arquivo JSON para persistência adicional
-    const dadosJSON = JSON.stringify(dados);
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(dadosJSON);
+    if (!response.ok) {
+      throw new Error('Falha ao salvar dados no servidor');
+    }
     
-    // Criar link para download automático
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "dashboard_dados.json");
-    document.body.appendChild(downloadAnchorNode); // necessário para Firefox
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
-    
-    await addLog(LOG_TYPES.INFO, "Dados salvos com sucesso");
+    await addLog(LOG_TYPES.INFO, "Dados salvos com sucesso no servidor");
     return true;
   } catch (error) {
     await addLog(LOG_TYPES.ERROR, `Erro ao salvar dados: ${error.message}`);
-    return false;
+    
+    // Fallback para localStorage em caso de falha do servidor
+    try {
+      localStorage.setItem('dashboardData', JSON.stringify(dados));
+      await addLog(LOG_TYPES.WARNING, "Dados salvos no localStorage como fallback");
+      return true;
+    } catch (localError) {
+      await addLog(LOG_TYPES.ERROR, `Erro ao salvar dados localmente: ${localError.message}`);
+      return false;
+    }
   }
 };
 
 // Função para carregar dados
-export const carregarDados = () => {
+export const carregarDados = async () => {
   try {
-    const dados = localStorage.getItem(DATA_KEY);
-    return dados ? JSON.parse(dados) : null;
+    // Tentar carregar do servidor
+    const response = await fetch('/api/dashboard-data');
+    
+    if (response.ok) {
+      const dados = await response.json();
+      await addLog(LOG_TYPES.INFO, "Dados carregados do servidor");
+      return dados;
+    } else {
+      throw new Error('Falha ao carregar dados do servidor');
+    }
   } catch (error) {
-    addLog(LOG_TYPES.ERROR, `Erro ao carregar dados: ${error.message}`);
+    await addLog(LOG_TYPES.ERROR, `Erro ao carregar dados do servidor: ${error.message}`);
+    
+    // Fallback para localStorage
+    try {
+      const dados = localStorage.getItem('dashboardData');
+      if (dados) {
+        await addLog(LOG_TYPES.WARNING, "Dados carregados do localStorage como fallback");
+        return JSON.parse(dados);
+      }
+    } catch (localError) {
+      await addLog(LOG_TYPES.ERROR, `Erro ao carregar dados locais: ${localError.message}`);
+    }
+    
     return null;
   }
 };
@@ -259,8 +284,8 @@ export const importarDados = async (arquivo) => {
         // Atualizar a data de importação
         dados.dataAtualizacao = new Date().toISOString();
         
-        // Salvar os dados
-        localStorage.setItem(DATA_KEY, JSON.stringify(dados));
+        // Salvar no servidor
+        await salvarDados(dados);
         
         await addLog(
           LOG_TYPES.UPDATE, 
@@ -290,18 +315,21 @@ export const importarDados = async (arquivo) => {
 // Função para exportar dados atuais
 export const exportarDados = async () => {
   try {
-    const dados = localStorage.getItem(DATA_KEY);
+    // Carregar dados atuais do servidor
+    const response = await fetch('/api/dashboard-data');
     
-    if (!dados) {
-      throw new Error("Nenhum dado disponível para exportação.");
+    if (!response.ok) {
+      throw new Error("Erro ao buscar dados para exportação");
     }
+    
+    const dados = await response.json();
     
     // Criar nome de arquivo com data atual
     const date = new Date().toISOString().split('T')[0];
     const filename = `dashboard_dados_${date}.json`;
     
     // Criar blob com dados
-    const blob = new Blob([dados], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
     
     // Criar URL para download
     const url = URL.createObjectURL(blob);

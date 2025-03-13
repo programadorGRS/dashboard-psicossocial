@@ -1,3 +1,5 @@
+import { getAuth } from '../auth/auth';
+
 export const LOG_TYPES = {
   INFO: 'info',
   WARNING: 'warning',
@@ -9,7 +11,7 @@ export const LOG_TYPES = {
 
 export const log = async (type, message, details = null) => {
   try {
-    const auth = JSON.parse(localStorage.getItem('auth') || '{}');
+    const auth = getAuth() || {};
     
     const logEntry = {
       type,
@@ -19,14 +21,36 @@ export const log = async (type, message, details = null) => {
       timestamp: new Date().toISOString()
     };
     
-    const logs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
-    logs.push(logEntry);
-    
-    if (logs.length > 500) {
-      logs.splice(0, logs.length - 500);
+    // Enviar log para o servidor
+    try {
+      const response = await fetch('/api/logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(logEntry),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Falha ao enviar log para o servidor');
+      }
+      
+      const result = await response.json();
+      logEntry.id = result.id;
+    } catch (serverError) {
+      console.error('Erro ao enviar log para o servidor:', serverError);
+      
+      // Fallback para localStorage
+      const logs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
+      logEntry.id = Date.now() + Math.random().toString(36).substring(2, 9);
+      logs.push(logEntry);
+      
+      if (logs.length > 500) {
+        logs.splice(0, logs.length - 500);
+      }
+      
+      localStorage.setItem('systemLogs', JSON.stringify(logs));
     }
-    
-    localStorage.setItem('systemLogs', JSON.stringify(logs));
     
     if (process.env.NODE_ENV === 'development') {
       console.log(`[${type.toUpperCase()}] ${message}`, details || '');
@@ -39,19 +63,41 @@ export const log = async (type, message, details = null) => {
   }
 };
 
-export const getLogs = () => {
+export const getLogs = async () => {
   try {
-    const logs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
-    return logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    // Carregar logs do servidor
+    const response = await fetch('/api/logs');
+    
+    if (response.ok) {
+      const logs = await response.json();
+      return logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    } else {
+      throw new Error('Falha ao carregar logs do servidor');
+    }
   } catch (error) {
-    console.error('Erro ao obter logs:', error);
-    return [];
+    console.error('Erro ao obter logs do servidor:', error);
+    
+    // Fallback para localStorage
+    try {
+      const logs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
+      return logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    } catch (localError) {
+      console.error('Erro ao obter logs locais:', localError);
+      return [];
+    }
   }
 };
 
-export const exportLogs = () => {
+export const exportLogs = async () => {
   try {
-    const logs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
+    // Carregar logs do servidor
+    const response = await fetch('/api/logs');
+    
+    if (!response.ok) {
+      throw new Error("Erro ao buscar logs para exportação");
+    }
+    
+    const logs = await response.json();
     
     const date = new Date().toISOString().split('T')[0];
     const filename = `logs_sistema_${date}.json`;
@@ -83,20 +129,22 @@ export const importLogs = async (file) => {
     const text = await file.text();
     const logsFromFile = JSON.parse(text);
     
-    const currentLogs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
+    // Enviar para o servidor
+    const response = await fetch('/api/logs/import', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(logsFromFile),
+    });
     
-    const existingIds = new Set(currentLogs.map(log => log.id));
-    const newLogs = logsFromFile.filter(log => !existingIds.has(log.id));
-    
-    const mergedLogs = [...currentLogs, ...newLogs];
-    
-    if (mergedLogs.length > 5000) {
-      mergedLogs.splice(0, mergedLogs.length - 5000);
+    if (!response.ok) {
+      throw new Error('Falha ao importar logs para o servidor');
     }
     
-    localStorage.setItem('systemLogs', JSON.stringify(mergedLogs));
+    const result = await response.json();
     
-    log(LOG_TYPES.INFO, `${newLogs.length} logs importados de ${file.name}`);
+    log(LOG_TYPES.INFO, `${result.imported} logs importados de ${file.name}`);
     return true;
   } catch (error) {
     console.error('Erro ao importar logs:', error);

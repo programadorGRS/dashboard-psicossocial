@@ -33,33 +33,21 @@ const Dashboard = ({ onLogout }) => {
   }, []);
   
   // Efeito para carregar dados iniciais
+  // No useEffect para carregar dados iniciais
   useEffect(() => {
     const carregarDadosIniciais = async () => {
       setCarregando(true);
       
       try {
-        // Tentar carregar dados salvos
-        const dadosSalvos = carregarDados();
+        // Carregar dados do servidor
+        const dadosSalvos = await carregarDados();
         
         if (dadosSalvos) {
           setDadosJSON(dadosSalvos);
           setDataAtualizacao(new Date(dadosSalvos.dataAtualizacao || new Date()));
-          PermanentLogger.log(LOG_TYPES.INFO, "Dados carregados do armazenamento local");
+          PermanentLogger.log(LOG_TYPES.INFO, "Dados carregados do servidor");
         } else {
-          // Se não houver dados salvos, usar dados de demonstração
-          const dadosDemo = {
-            totalRespondentes: 120,
-            mediaGeral: 2.7,
-            todasPerguntas: [],
-            perguntasCriticas: [],
-            dadosCategoria: [],
-            dadosSetores: [],
-            dadosFuncoes: [],
-            dataAtualizacao: new Date().toISOString()
-          };
-          
-          setDadosJSON(dadosDemo);
-          PermanentLogger.log(LOG_TYPES.INFO, "Dados de demonstração carregados");
+          setErro("Não foi possível carregar os dados do servidor.");
         }
       } catch (error) {
         console.error("Erro ao carregar dados iniciais:", error);
@@ -72,6 +60,8 @@ const Dashboard = ({ onLogout }) => {
     
     carregarDadosIniciais();
   }, []);
+
+  // Atualizar também outras funções que usam salvarDados, importarDados, etc.
   
   // Handler para upload de arquivo
   const handleUploadArquivo = async (evento) => {
