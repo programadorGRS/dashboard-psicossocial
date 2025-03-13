@@ -11,12 +11,11 @@ const Dashboard = ({ onLogout }) => {
   const [dadosJSON, setDadosJSON] = useState(null);
   const [categoriaAtiva, setCategoriaAtiva] = useState(null);
   const [perguntasVisiveis, setPerguntasVisiveis] = useState(10);
-  const [carregando, setCarregando] = useState(true);
+  const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState(null);
-  const [dataAtualizacao, setDataAtualizacao] = useState(new Date());
+  const [dataAtualizacao, setDataAtualizacao] = useState(null);
   const [exibirModalUpload, setExibirModalUpload] = useState(false);
   const [usuario, setUsuario] = useState(null);
-  const [activeTab, setActiveTab] = useState('setor');
   
   useEffect(() => {
     const auth = getAuth();
@@ -25,31 +24,6 @@ const Dashboard = ({ onLogout }) => {
     }
   }, []);
   
-  useEffect(() => {
-    const carregarDadosIniciais = async () => {
-      setCarregando(true);
-      
-      try {
-        const dadosSalvos = await carregarDados();
-        
-        if (dadosSalvos) {
-          setDadosJSON(dadosSalvos);
-          setDataAtualizacao(new Date(dadosSalvos.dataAtualizacao || new Date()));
-          console.log("Dados carregados com sucesso");
-        } else {
-          setErro("Não foi possível carregar os dados iniciais.");
-        }
-      } catch (error) {
-        console.error("Erro ao carregar dados iniciais:", error);
-        setErro("Não foi possível carregar os dados iniciais.");
-      } finally {
-        setCarregando(false);
-      }
-    };
-    
-    carregarDadosIniciais();
-  }, []);
-
   const handleUploadArquivo = async (evento) => {
     const arquivo = evento.target.files[0];
     if (!arquivo) return;
