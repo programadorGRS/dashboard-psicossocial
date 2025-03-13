@@ -2,29 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from 'recharts';
 import _ from 'lodash';
 import { getAuth, logout } from '../auth/auth';
-import PermanentLogger from '../utils/permanentLogger';
-import { LOG_TYPES } from '../utils/logTypes';
-import { processarArquivoXLSX, salvarDados, carregarDados, exportarDados, importarDados, determinarNivel } from '../utils/dataService';
-import LogViewer from './LogViewer';
+import { processarArquivoXLSX, salvarDados, carregarDados, exportarDados, determinarNivel } from '../utils/dataService';
 
-// Cores para o dashboard
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 const NIVEL_CORES = ['#00C49F', '#82ca9d', '#FFBB28', '#FF8042', '#FF0000'];
 
-// Componente principal do Dashboard
 const Dashboard = ({ onLogout }) => {
   const [dadosJSON, setDadosJSON] = useState(null);
   const [categoriaAtiva, setCategoriaAtiva] = useState(null);
   const [perguntasVisiveis, setPerguntasVisiveis] = useState(10);
-  const [carregando, setCarregando] = useState(true); // Alterado para true inicialmente
+  const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [dataAtualizacao, setDataAtualizacao] = useState(new Date());
   const [exibirModalUpload, setExibirModalUpload] = useState(false);
-  const [exibirLogs, setExibirLogs] = useState(false);
   const [usuario, setUsuario] = useState(null);
   const [activeTab, setActiveTab] = useState('setor');
   
-  // Efeito para carregar informações do usuário
   useEffect(() => {
     const auth = getAuth();
     if (auth) {
@@ -37,12 +30,12 @@ const Dashboard = ({ onLogout }) => {
       setCarregando(true);
       
       try {
-        // Carregar dados do servidor (agora assíncrono)
         const dadosSalvos = await carregarDados();
         
         if (dadosSalvos) {
           setDadosJSON(dadosSalvos);
           setDataAtualizacao(new Date(dadosSalvos.dataAtualizacao || new Date()));
+          console.log("Dados carregados com sucesso");
         } else {
           setErro("Não foi possível carregar os dados iniciais.");
         }
@@ -57,7 +50,6 @@ const Dashboard = ({ onLogout }) => {
     carregarDadosIniciais();
   }, []);
 
-
   const handleUploadArquivo = async (evento) => {
     const arquivo = evento.target.files[0];
     if (!arquivo) return;
@@ -66,18 +58,15 @@ const Dashboard = ({ onLogout }) => {
     setErro(null);
     
     try {
-      // ...processamento do arquivo
       const dadosProcessados = await processarArquivoXLSX(arquivo);
       
-      // Atualizar o estado
       setDadosJSON(dadosProcessados);
       setDataAtualizacao(new Date());
       
-      // Salvar dados (agora assíncrono)
       await salvarDados(dadosProcessados);
       
-      // Fechar o modal
       setExibirModalUpload(false);
+      console.log("Arquivo processado com sucesso");
     } catch (error) {
       console.error("Erro ao processar arquivo:", error);
       setErro(`Erro ao processar o arquivo: ${error.message}`);
@@ -86,37 +75,6 @@ const Dashboard = ({ onLogout }) => {
     }
   };
   
-  const handleImportarDados = async (evento) => {
-    const arquivo = evento.target.files[0];
-    if (!arquivo) return;
-    
-    setCarregando(true);
-    setErro(null);
-    
-    try {
-      PermanentLogger.log(LOG_TYPES.INFO, `Iniciando importação de dados: ${arquivo.name}`);
-      
-      // Importar dados do arquivo JSON
-      const dadosImportados = await importarDados(arquivo);
-      
-      // Atualizar o estado
-      setDadosJSON(dadosImportados);
-      setDataAtualizacao(new Date());
-      
-      // Fechar o modal de upload
-      setExibirModalUpload(false);
-      
-      PermanentLogger.log(LOG_TYPES.UPDATE, `Dados importados com sucesso: ${arquivo.name}`);
-    } catch (error) {
-      console.error("Erro ao importar dados:", error);
-      setErro(`Erro ao importar dados: ${error.message}`);
-      PermanentLogger.log(LOG_TYPES.ERROR, `Erro ao importar dados: ${error.message}`);
-    } finally {
-      setCarregando(false);
-    }
-  };
-  
-  // Handler para exportar dados
   const handleExportarDados = () => {
     if (!dadosJSON) {
       setErro("Não há dados para exportar");
@@ -124,20 +82,18 @@ const Dashboard = ({ onLogout }) => {
     }
     
     if (exportarDados()) {
-      PermanentLogger.log(LOG_TYPES.INFO, "Dados exportados com sucesso");
+      console.log("Dados exportados com sucesso");
     } else {
       setErro("Erro ao exportar dados");
-      PermanentLogger.log(LOG_TYPES.ERROR, "Erro ao exportar dados");
+      console.error("Erro ao exportar dados");
     }
   };
   
-  // Handler para logout
   const handleLogout = () => {
     logout();
     onLogout();
   };
   
-  // Função para determinar cor do nível
   const corDoNivel = (nivel) => {
     switch(nivel) {
       case "Baixo": return NIVEL_CORES[0];
@@ -149,7 +105,6 @@ const Dashboard = ({ onLogout }) => {
     }
   };
   
-  // Formatador para tooltips
   const formatarMedia = (value) => [value.toFixed(2), 'Média'];
   
   const ModalUpload = () => {
@@ -184,7 +139,6 @@ const Dashboard = ({ onLogout }) => {
     );
   };
   
-  // Renderização condicional - Carregando
   if (carregando) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -196,7 +150,6 @@ const Dashboard = ({ onLogout }) => {
     );
   }
   
-  // Renderização condicional - Erro
   if (erro) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -214,7 +167,6 @@ const Dashboard = ({ onLogout }) => {
     );
   }
   
-  // Renderização condicional - Sem Dados
   if (!dadosJSON) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -232,11 +184,9 @@ const Dashboard = ({ onLogout }) => {
     );
   }
   
-  // Garantir que as propriedades existam antes de acessá-las
   const todasPerguntas = dadosJSON.todasPerguntas || [];
   const dadosCategoria = dadosJSON.dadosCategoria || [];
   
-  // Filtrar perguntas por categoria, se uma estiver selecionada
   const perguntasFiltradas = categoriaAtiva 
     ? todasPerguntas.filter(p => {
         const categoria = dadosCategoria.find(c => c.categoria === categoriaAtiva);
@@ -246,7 +196,6 @@ const Dashboard = ({ onLogout }) => {
   
   const perguntasExibidas = perguntasFiltradas.slice(0, perguntasVisiveis);
   
-  // Dados para o gráfico de distribuição de níveis
   const dadosNiveis = (() => {
     if (!todasPerguntas.length) return [];
     const contagem = _.countBy(todasPerguntas, 'nivel');
@@ -257,32 +206,25 @@ const Dashboard = ({ onLogout }) => {
     }));
   })();
   
-  // Encontrar categoria com menor média (ponto forte)
   const categoriaMenorMedia = dadosCategoria.length ? _.minBy(dadosCategoria, 'media') : null;
   
-  // Identificar os 3 itens com menor média (pontos positivos)
   const perguntasMenorMedia = todasPerguntas.length ? _.sortBy(todasPerguntas, 'media').slice(0, 3) : [];
   
-  // Processar dados por setor e cargo
   const processarDadosPorSegmento = () => {
     if (!dadosJSON.dadosOriginais || !Array.isArray(dadosJSON.dadosOriginais)) {
       return { dadosPorSetor: {}, dadosPorCargo: {} };
     }
     
-    // Análise por setor
     const dadosPorSetor = {};
     const setores = [...new Set(dadosJSON.dadosOriginais.map(item => item['Qual seu setor?']).filter(Boolean))];
     
     setores.forEach(setor => {
       if (!setor) return;
       
-      // Filtrar respondentes deste setor
       const respostasDoSetor = dadosJSON.dadosOriginais.filter(item => item['Qual seu setor?'] === setor);
       
-      // Calcular médias para este setor
       const mediasPorPergunta = {};
       
-      // Iterar sobre todas as perguntas
       todasPerguntas.forEach(perguntaObj => {
         if (!perguntaObj || !perguntaObj.pergunta) return;
         
@@ -296,7 +238,6 @@ const Dashboard = ({ onLogout }) => {
         }
       });
       
-      // Ordenar por média (do maior para o menor) e pegar as 5 piores
       const perguntasOrdenadas = Object.entries(mediasPorPergunta)
         .map(([pergunta, media]) => ({
           pergunta,
@@ -313,20 +254,16 @@ const Dashboard = ({ onLogout }) => {
       };
     });
     
-    // Análise por cargo/função
     const dadosPorCargo = {};
     const cargos = [...new Set(dadosJSON.dadosOriginais.map(item => item['Qual sua função?']).filter(Boolean))];
     
     cargos.forEach(cargo => {
       if (!cargo) return;
       
-      // Filtrar respondentes deste cargo
       const respostasDoCargo = dadosJSON.dadosOriginais.filter(item => item['Qual sua função?'] === cargo);
       
-      // Calcular médias para este cargo
       const mediasPorPergunta = {};
       
-      // Iterar sobre todas as perguntas
       todasPerguntas.forEach(perguntaObj => {
         if (!perguntaObj || !perguntaObj.pergunta) return;
         
@@ -340,7 +277,6 @@ const Dashboard = ({ onLogout }) => {
         }
       });
       
-      // Ordenar por média (do maior para o menor) e pegar as 5 piores
       const perguntasOrdenadas = Object.entries(mediasPorPergunta)
         .map(([pergunta, media]) => ({
           pergunta,
@@ -360,7 +296,6 @@ const Dashboard = ({ onLogout }) => {
     return { dadosPorSetor, dadosPorCargo };
   };
   
-  // Processar os dados por segmento com tratamento de erros
   let dadosPorSetor = {}, dadosPorCargo = {};
   try {
     const resultado = processarDadosPorSegmento();
@@ -368,7 +303,6 @@ const Dashboard = ({ onLogout }) => {
     dadosPorCargo = resultado.dadosPorCargo;
   } catch (error) {
     console.error("Erro ao processar dados por segmento:", error);
-    // Não propagamos o erro para não quebrar a renderização
   }
   
   return (
@@ -376,7 +310,6 @@ const Dashboard = ({ onLogout }) => {
       <ModalUpload />
       
       <div className="container mx-auto">
-        {/* Header com Logo e Botão de Atualização */}
         <div className="flex justify-between items-center mb-4">
           <a 
             href="https://www.grsnucleo.com.br/" 
@@ -388,24 +321,24 @@ const Dashboard = ({ onLogout }) => {
           </a>
           
           <div className="flex items-center space-x-4">
-          <div className="text-sm text-gray-500">
-            Última atualização: {dataAtualizacao.toLocaleDateString()} às {dataAtualizacao.toLocaleTimeString()}
-          </div>
+            <div className="text-sm text-gray-500">
+              Última atualização: {dataAtualizacao.toLocaleDateString()} às {dataAtualizacao.toLocaleTimeString()}
+            </div>
             
-          <div className="flex space-x-2">
-          <button 
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            onClick={() => setExibirModalUpload(true)}
-          >
-            Atualizar
-          </button>
+            <div className="flex space-x-2">
+              <button 
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                onClick={() => setExibirModalUpload(true)}
+              >
+                Atualizar
+              </button>
               
-          <button 
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            onClick={handleExportarDados}
-          >
-            Exportar
-          </button>
+              <button 
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                onClick={handleExportarDados}
+              >
+                Exportar
+              </button>
               
               <button 
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
@@ -417,30 +350,20 @@ const Dashboard = ({ onLogout }) => {
           </div>
         </div>
         
-        {/* Informações do Usuário */}
         <div className="bg-blue-50 p-3 rounded-lg mb-4 flex justify-between items-center">
           <div>
-            <span className="font-semibold">Usuário:</span> {usuario?.user} ({usuario?.role})
+            <span className="font-semibold">Usuário:</span> {usuario?.role || 'Usuário'}
           </div>
           <div className="text-sm text-gray-600">
             Login em: {usuario?.loginTime ? new Date(usuario.loginTime).toLocaleString() : 'N/A'}
           </div>
         </div>
-        
-        {/* Logs do Sistema (condicional) */}
-        {exibirLogs && (
-          <div className="mb-6">
-            <LogViewer />
-          </div>
-        )}
-        
-        {/* Cabeçalho Principal */}
+
         <header className="bg-white shadow rounded-lg p-6 mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Dashboard - Mapeamento de Fatores Psicossociais</h1>
           <p className="text-gray-600">Análise baseada em {dadosJSON.totalRespondentes || 0} respondentes e {todasPerguntas.length} questões avaliadas</p>
         </header>
         
-        {/* Indicador Geral */}
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">Indicador Geral</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -521,7 +444,6 @@ const Dashboard = ({ onLogout }) => {
           </div>
         </div>
         
-        {/* Categorias */}
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">Categorias de Fatores Psicossociais</h2>
@@ -615,7 +537,6 @@ const Dashboard = ({ onLogout }) => {
             </div>
           </div>
           
-          {/* Explicação das Categorias */}
           <div className="mt-8">
             <h3 className="font-bold text-lg mb-3">O que significa cada categoria?</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -639,7 +560,6 @@ const Dashboard = ({ onLogout }) => {
           </div>
         </div>
         
-        {/* Categoria Detalhada */}
         {categoriaAtiva && (
           <div className="bg-white shadow rounded-lg p-6 mb-6">
             <h2 className="text-xl font-bold mb-4">
@@ -717,7 +637,6 @@ const Dashboard = ({ onLogout }) => {
           </div>
         )}
         
-        {/* Top 5 Áreas Críticas */}
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">Top 5 Áreas Mais Críticas</h2>
           <div className="h-80">
@@ -760,11 +679,9 @@ const Dashboard = ({ onLogout }) => {
           </div>
         </div>
         
-        {/* Análise por Setor e Cargo - NOVA SEÇÃO */}
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">Análise por Setor e Cargo</h2>
           
-          {/* Tabs para alternar entre Setor e Cargo */}
           <div className="border-b mb-6">
             <nav className="-mb-px flex space-x-6">
               <button
@@ -790,7 +707,6 @@ const Dashboard = ({ onLogout }) => {
             </nav>
           </div>
           
-          {/* Conteúdo baseado na tab ativa */}
           <div>
             {activeTab === 'setor' ? (
               <div>
@@ -910,7 +826,6 @@ const Dashboard = ({ onLogout }) => {
           </div>
         </div>
         
-        {/* Todas as Perguntas */}
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">
@@ -983,7 +898,6 @@ const Dashboard = ({ onLogout }) => {
           )}
         </div>
         
-        {/* Distribuição por Função e Setor */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="bg-white shadow rounded-lg p-6">
             <h2 className="text-xl font-bold mb-4">Distribuição por Função</h2>
@@ -1048,7 +962,6 @@ const Dashboard = ({ onLogout }) => {
           </div>
         </div>
         
-        {/* Análise de Conclusão */}
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">Conclusões e Recomendações</h2>
           
