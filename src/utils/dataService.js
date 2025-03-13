@@ -10,6 +10,17 @@ export const determinarNivel = (media) => {
   return "Alto";
 };
 
+// Função para salvar dados 
+export const salvarDados = (dados) => {
+  try {
+    localStorage.setItem('dashboardData', JSON.stringify(dados));
+    return true;
+  } catch (error) {
+    console.error("Erro ao salvar dados:", error);
+    return false;
+  }
+};
+
 // Função para processar o arquivo XLSX e gerar o JSON
 export const processarArquivoXLSX = (arquivo) => {
   return new Promise((resolve, reject) => {
@@ -168,8 +179,8 @@ export const processarArquivoXLSX = (arquivo) => {
           dadosOriginais: jsonData
         };
         
-        // Salvar no localStorage
-        localStorage.setItem('dashboardData', JSON.stringify(dadosProcessados));
+        // Salvar dados
+        salvarDados(dadosProcessados);
         
         resolve(dadosProcessados);
       } catch (error) {
