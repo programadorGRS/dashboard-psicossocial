@@ -205,67 +205,36 @@ export const processarArquivoXLSX = async (arquivo) => {
 // Função para salvar dados
 export const salvarDados = async (dados) => {
   try {
-    // Salvar no servidor
-    const response = await fetch('/api/dashboard-data', {
+    const response = await fetch('/api/updateData', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(dados),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dados)
     });
     
-    if (!response.ok) {
-      throw new Error('Falha ao salvar dados no servidor');
-    }
+    if (!response.ok) throw new Error('Falha ao salvar dados');
     
     await addLog(LOG_TYPES.INFO, "Dados salvos com sucesso no servidor");
     return true;
   } catch (error) {
     await addLog(LOG_TYPES.ERROR, `Erro ao salvar dados: ${error.message}`);
-    
-    // Fallback para localStorage em caso de falha do servidor
-    try {
-      localStorage.setItem('dashboardData', JSON.stringify(dados));
-      await addLog(LOG_TYPES.WARNING, "Dados salvos no localStorage como fallback");
-      return true;
-    } catch (localError) {
-      await addLog(LOG_TYPES.ERROR, `Erro ao salvar dados localmente: ${localError.message}`);
-      return false;
-    }
+    return false;
   }
 };
 
 // Função para carregar dados
 export const carregarDados = async () => {
   try {
-    // Tentar carregar do servidor
-    const response = await fetch('/api/dashboard-data');
+    const response = await fetch('/data/dashboard-data.json');
+    if (!response.ok) throw new Error('Falha ao carregar dados');
     
-    if (response.ok) {
-      const dados = await response.json();
-      await addLog(LOG_TYPES.INFO, "Dados carregados do servidor");
-      return dados;
-    } else {
-      throw new Error('Falha ao carregar dados do servidor');
-    }
+    const dados = await response.json();
+    await addLog(LOG_TYPES.INFO, "Dados carregados do servidor");
+    return dados;
   } catch (error) {
-    await addLog(LOG_TYPES.ERROR, `Erro ao carregar dados do servidor: ${error.message}`);
-    
-    // Fallback para localStorage
-    try {
-      const dados = localStorage.getItem('dashboardData');
-      if (dados) {
-        await addLog(LOG_TYPES.WARNING, "Dados carregados do localStorage como fallback");
-        return JSON.parse(dados);
-      }
-    } catch (localError) {
-      await addLog(LOG_TYPES.ERROR, `Erro ao carregar dados locais: ${localError.message}`);
-    }
-    
+    await addLog(LOG_TYPES.ERROR, `Erro ao carregar dados: ${error.message}`);
     return null;
   }
 };
-
 // Função para importar dados de um arquivo
 export const importarDados = async (arquivo) => {
   return new Promise((resolve, reject) => {

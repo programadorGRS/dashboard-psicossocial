@@ -21,36 +21,11 @@ export const log = async (type, message, details = null) => {
       timestamp: new Date().toISOString()
     };
     
-    // Enviar log para o servidor
-    try {
-      const response = await fetch('/api/logs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(logEntry),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Falha ao enviar log para o servidor');
-      }
-      
-      const result = await response.json();
-      logEntry.id = result.id;
-    } catch (serverError) {
-      console.error('Erro ao enviar log para o servidor:', serverError);
-      
-      // Fallback para localStorage
-      const logs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
-      logEntry.id = Date.now() + Math.random().toString(36).substring(2, 9);
-      logs.push(logEntry);
-      
-      if (logs.length > 500) {
-        logs.splice(0, logs.length - 500);
-      }
-      
-      localStorage.setItem('systemLogs', JSON.stringify(logs));
-    }
+    await fetch('/api/updateLogs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(logEntry)
+    });
     
     if (process.env.NODE_ENV === 'development') {
       console.log(`[${type.toUpperCase()}] ${message}`, details || '');
@@ -65,26 +40,14 @@ export const log = async (type, message, details = null) => {
 
 export const getLogs = async () => {
   try {
-    // Carregar logs do servidor
-    const response = await fetch('/api/logs');
+    const response = await fetch('/data/system-logs.json');
+    if (!response.ok) throw new Error('Falha ao carregar logs');
     
-    if (response.ok) {
-      const logs = await response.json();
-      return logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    } else {
-      throw new Error('Falha ao carregar logs do servidor');
-    }
+    const logs = await response.json();
+    return logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   } catch (error) {
-    console.error('Erro ao obter logs do servidor:', error);
-    
-    // Fallback para localStorage
-    try {
-      const logs = JSON.parse(localStorage.getItem('systemLogs') || '[]');
-      return logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    } catch (localError) {
-      console.error('Erro ao obter logs locais:', localError);
-      return [];
-    }
+    console.error('Erro ao obter logs:', error);
+    return [];
   }
 };
 

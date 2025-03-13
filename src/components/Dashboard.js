@@ -32,27 +32,23 @@ const Dashboard = ({ onLogout }) => {
     }
   }, []);
   
-  // Efeito para carregar dados iniciais
-  // No useEffect para carregar dados iniciais
   useEffect(() => {
     const carregarDadosIniciais = async () => {
       setCarregando(true);
       
       try {
-        // Carregar dados do servidor
+        // Carregar dados do servidor (agora assíncrono)
         const dadosSalvos = await carregarDados();
         
         if (dadosSalvos) {
           setDadosJSON(dadosSalvos);
           setDataAtualizacao(new Date(dadosSalvos.dataAtualizacao || new Date()));
-          PermanentLogger.log(LOG_TYPES.INFO, "Dados carregados do servidor");
         } else {
-          setErro("Não foi possível carregar os dados do servidor.");
+          setErro("Não foi possível carregar os dados iniciais.");
         }
       } catch (error) {
         console.error("Erro ao carregar dados iniciais:", error);
         setErro("Não foi possível carregar os dados iniciais.");
-        PermanentLogger.log(LOG_TYPES.ERROR, `Erro ao carregar dados iniciais: ${error.message}`);
       } finally {
         setCarregando(false);
       }
@@ -61,9 +57,7 @@ const Dashboard = ({ onLogout }) => {
     carregarDadosIniciais();
   }, []);
 
-  // Atualizar também outras funções que usam salvarDados, importarDados, etc.
-  
-  // Handler para upload de arquivo
+
   const handleUploadArquivo = async (evento) => {
     const arquivo = evento.target.files[0];
     if (!arquivo) return;
@@ -72,32 +66,26 @@ const Dashboard = ({ onLogout }) => {
     setErro(null);
     
     try {
-      PermanentLogger.log(LOG_TYPES.INFO, `Iniciando processamento do arquivo: ${arquivo.name}`);
-      
-      // Processar o arquivo XLSX
+      // ...processamento do arquivo
       const dadosProcessados = await processarArquivoXLSX(arquivo);
       
       // Atualizar o estado
       setDadosJSON(dadosProcessados);
       setDataAtualizacao(new Date());
       
-      // Salvar dados para persistência
-      salvarDados(dadosProcessados);
+      // Salvar dados (agora assíncrono)
+      await salvarDados(dadosProcessados);
       
-      // Fechar o modal de upload
+      // Fechar o modal
       setExibirModalUpload(false);
-      
-      PermanentLogger.log(LOG_TYPES.UPDATE, `Arquivo processado e dados atualizados: ${arquivo.name}`);
     } catch (error) {
       console.error("Erro ao processar arquivo:", error);
       setErro(`Erro ao processar o arquivo: ${error.message}`);
-      PermanentLogger.log(LOG_TYPES.ERROR, `Erro ao processar arquivo: ${error.message}`);
     } finally {
       setCarregando(false);
     }
   };
   
-  // Handler para importar dados JSON
   const handleImportarDados = async (evento) => {
     const arquivo = evento.target.files[0];
     if (!arquivo) return;
