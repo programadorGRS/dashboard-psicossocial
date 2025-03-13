@@ -16,13 +16,13 @@ const Dashboard = ({ onLogout }) => {
   const [dadosJSON, setDadosJSON] = useState(null);
   const [categoriaAtiva, setCategoriaAtiva] = useState(null);
   const [perguntasVisiveis, setPerguntasVisiveis] = useState(10);
-  const [carregando, setCarregando] = useState(false);
+  const [carregando, setCarregando] = useState(true); // Alterado para true inicialmente
   const [erro, setErro] = useState(null);
   const [dataAtualizacao, setDataAtualizacao] = useState(new Date());
   const [exibirModalUpload, setExibirModalUpload] = useState(false);
   const [exibirLogs, setExibirLogs] = useState(false);
   const [usuario, setUsuario] = useState(null);
-  const [activeTab, setActiveTab] = useState('setor'); // Estado para controlar tabs setor/cargo
+  const [activeTab, setActiveTab] = useState('setor');
   
   // Efeito para carregar informações do usuário
   useEffect(() => {
@@ -48,7 +48,14 @@ const Dashboard = ({ onLogout }) => {
         } else {
           // Se não houver dados salvos, usar dados de demonstração
           const dadosDemo = {
-            // ... (dados de demonstração permanecem iguais)
+            totalRespondentes: 120,
+            mediaGeral: 2.7,
+            todasPerguntas: [],
+            perguntasCriticas: [],
+            dadosCategoria: [],
+            dadosSetores: [],
+            dadosFuncoes: [],
+            dataAtualizacao: new Date().toISOString()
           };
           
           setDadosJSON(dadosDemo);
@@ -133,6 +140,11 @@ const Dashboard = ({ onLogout }) => {
   
   // Handler para exportar dados
   const handleExportarDados = () => {
+    if (!dadosJSON) {
+      setErro("Não há dados para exportar");
+      return;
+    }
+    
     if (exportarDados()) {
       PermanentLogger.log(LOG_TYPES.INFO, "Dados exportados com sucesso");
     } else {
@@ -254,19 +266,24 @@ const Dashboard = ({ onLogout }) => {
     );
   }
   
+  // Garantir que as propriedades existam antes de acessá-las
+  const todasPerguntas = dadosJSON.todasPerguntas || [];
+  const dadosCategoria = dadosJSON.dadosCategoria || [];
+  
   // Filtrar perguntas por categoria, se uma estiver selecionada
   const perguntasFiltradas = categoriaAtiva 
-    ? dadosJSON.todasPerguntas.filter(p => {
-        const categoria = dadosJSON.dadosCategoria.find(c => c.categoria === categoriaAtiva);
-        return categoria && categoria.perguntas.includes(p.pergunta);
+    ? todasPerguntas.filter(p => {
+        const categoria = dadosCategoria.find(c => c.categoria === categoriaAtiva);
+        return categoria && categoria.perguntas && categoria.perguntas.includes(p.pergunta);
       })
-    : dadosJSON.todasPerguntas;
+    : todasPerguntas;
   
   const perguntasExibidas = perguntasFiltradas.slice(0, perguntasVisiveis);
   
   // Dados para o gráfico de distribuição de níveis
   const dadosNiveis = (() => {
-    const contagem = _.countBy(dadosJSON.todasPerguntas, 'nivel');
+    if (!todasPerguntas.length) return [];
+    const contagem = _.countBy(todasPerguntas, 'nivel');
     return Object.entries(contagem).map(([nivel, quantidade]) => ({
       name: nivel,
       value: quantidade,
@@ -275,22 +292,24 @@ const Dashboard = ({ onLogout }) => {
   })();
   
   // Encontrar categoria com menor média (ponto forte)
-  const categoriaMenorMedia = _.minBy(dadosJSON.dadosCategoria, 'media');
+  const categoriaMenorMedia = dadosCategoria.length ? _.minBy(dadosCategoria, 'media') : null;
   
   // Identificar os 3 itens com menor média (pontos positivos)
-  const perguntasMenorMedia = _.sortBy(dadosJSON.todasPerguntas, 'media').slice(0, 3);
+  const perguntasMenorMedia = todasPerguntas.length ? _.sortBy(todasPerguntas, 'media').slice(0, 3) : [];
   
   // Processar dados por setor e cargo
   const processarDadosPorSegmento = () => {
-    if (!dadosJSON.dadosOriginais) {
+    if (!dadosJSON.dadosOriginais || !Array.isArray(dadosJSON.dadosOriginais)) {
       return { dadosPorSetor: {}, dadosPorCargo: {} };
     }
     
     // Análise por setor
     const dadosPorSetor = {};
-    const setores = [...new Set(dadosJSON.dadosOriginais.map(item => item['Qual seu setor?']))];
+    const setores = [...new Set(dadosJSON.dadosOriginais.map(item => item['Qual seu setor?']).filter(Boolean))];
     
     setores.forEach(setor => {
+      if (!setor) return;
+      
       // Filtrar respondentes deste setor
       const respostasDoSetor = dadosJSON.dadosOriginais.filter(item => item['Qual seu setor?'] === setor);
       
@@ -298,7 +317,9 @@ const Dashboard = ({ onLogout }) => {
       const mediasPorPergunta = {};
       
       // Iterar sobre todas as perguntas
-      dadosJSON.todasPerguntas.forEach(perguntaObj => {
+      todasPerguntas.forEach(perguntaObj => {
+        if (!perguntaObj || !perguntaObj.pergunta) return;
+        
         const pergunta = perguntaObj.pergunta;
         const valores = respostasDoSetor
           .map(item => item[pergunta])
@@ -328,9 +349,11 @@ const Dashboard = ({ onLogout }) => {
     
     // Análise por cargo/função
     const dadosPorCargo = {};
-    const cargos = [...new Set(dadosJSON.dadosOriginais.map(item => item['Qual sua função?']))];
+    const cargos = [...new Set(dadosJSON.dadosOriginais.map(item => item['Qual sua função?']).filter(Boolean))];
     
     cargos.forEach(cargo => {
+      if (!cargo) return;
+      
       // Filtrar respondentes deste cargo
       const respostasDoCargo = dadosJSON.dadosOriginais.filter(item => item['Qual sua função?'] === cargo);
       
@@ -338,7 +361,9 @@ const Dashboard = ({ onLogout }) => {
       const mediasPorPergunta = {};
       
       // Iterar sobre todas as perguntas
-      dadosJSON.todasPerguntas.forEach(perguntaObj => {
+      todasPerguntas.forEach(perguntaObj => {
+        if (!perguntaObj || !perguntaObj.pergunta) return;
+        
         const pergunta = perguntaObj.pergunta;
         const valores = respostasDoCargo
           .map(item => item[pergunta])
@@ -369,8 +394,16 @@ const Dashboard = ({ onLogout }) => {
     return { dadosPorSetor, dadosPorCargo };
   };
   
-  // Processe os dados por segmento
-  const { dadosPorSetor, dadosPorCargo } = processarDadosPorSegmento();
+  // Processar os dados por segmento com tratamento de erros
+  let dadosPorSetor = {}, dadosPorCargo = {};
+  try {
+    const resultado = processarDadosPorSegmento();
+    dadosPorSetor = resultado.dadosPorSetor;
+    dadosPorCargo = resultado.dadosPorCargo;
+  } catch (error) {
+    console.error("Erro ao processar dados por segmento:", error);
+    // Não propagamos o erro para não quebrar a renderização
+  }
   
   return (
     <div className="bg-gray-50 p-4 min-h-screen">
@@ -431,7 +464,7 @@ const Dashboard = ({ onLogout }) => {
             <span className="font-semibold">Usuário:</span> {usuario?.user} ({usuario?.role})
           </div>
           <div className="text-sm text-gray-600">
-            Login em: {new Date(usuario?.loginTime).toLocaleString()}
+            Login em: {usuario?.loginTime ? new Date(usuario.loginTime).toLocaleString() : 'N/A'}
           </div>
         </div>
         
@@ -445,7 +478,7 @@ const Dashboard = ({ onLogout }) => {
         {/* Cabeçalho Principal */}
         <header className="bg-white shadow rounded-lg p-6 mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Dashboard - Mapeamento de Fatores Psicossociais</h1>
-          <p className="text-gray-600">Análise baseada em {dadosJSON.totalRespondentes} respondentes e {dadosJSON.todasPerguntas.length} questões avaliadas</p>
+          <p className="text-gray-600">Análise baseada em {dadosJSON.totalRespondentes || 0} respondentes e {todasPerguntas.length} questões avaliadas</p>
         </header>
         
         {/* Indicador Geral */}
@@ -456,10 +489,13 @@ const Dashboard = ({ onLogout }) => {
               <div className="relative w-64 h-64">
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <div className="text-6xl font-bold text-blue-600">{dadosJSON.mediaGeral.toFixed(2)}</div>
+                    <div className="text-6xl font-bold text-blue-600">{dadosJSON.mediaGeral?.toFixed(2) || "N/A"}</div>
                     <div className="text-xl mt-2">Média Geral</div>
-                    <div className="mt-2 inline-block px-3 py-1 rounded-full text-sm font-semibold" style={{ backgroundColor: corDoNivel(determinarNivel(dadosJSON.mediaGeral)) + '30', color: corDoNivel(determinarNivel(dadosJSON.mediaGeral)) }}>
-                      {determinarNivel(dadosJSON.mediaGeral)}
+                    <div className="mt-2 inline-block px-3 py-1 rounded-full text-sm font-semibold" style={{ 
+                      backgroundColor: (dadosJSON.mediaGeral ? corDoNivel(determinarNivel(dadosJSON.mediaGeral)) : "#888") + '30', 
+                      color: dadosJSON.mediaGeral ? corDoNivel(determinarNivel(dadosJSON.mediaGeral)) : "#888" 
+                    }}>
+                      {dadosJSON.mediaGeral ? determinarNivel(dadosJSON.mediaGeral) : "N/A"}
                     </div>
                   </div>
                 </div>
@@ -477,9 +513,9 @@ const Dashboard = ({ onLogout }) => {
                     cy="50" 
                     r="45" 
                     fill="none" 
-                    stroke={corDoNivel(determinarNivel(dadosJSON.mediaGeral))}
+                    stroke={dadosJSON.mediaGeral ? corDoNivel(determinarNivel(dadosJSON.mediaGeral)) : "#888"}
                     strokeWidth="8"
-                    strokeDasharray={`${2 * Math.PI * 45 * (dadosJSON.mediaGeral / 5)} ${2 * Math.PI * 45 * (1 - dadosJSON.mediaGeral / 5)}`}
+                    strokeDasharray={`${2 * Math.PI * 45 * ((dadosJSON.mediaGeral || 0) / 5)} ${2 * Math.PI * 45 * (1 - (dadosJSON.mediaGeral || 0) / 5)}`}
                     strokeDashoffset={2 * Math.PI * 45 * 0.25}
                     transform="rotate(-90 50 50)"
                   />
@@ -494,27 +530,33 @@ const Dashboard = ({ onLogout }) => {
             <div>
               <h3 className="font-semibold text-lg mb-3">Distribuição por Níveis de Risco</h3>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={dadosNiveis}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={true}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      dataKey="value"
-                    >
-                      {dadosNiveis.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value) => [`${value} pergunta(s)`, 'Quantidade']}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+                {dadosNiveis.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={dadosNiveis}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={true}
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        dataKey="value"
+                      >
+                        {dadosNiveis.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value) => [`${value} pergunta(s)`, 'Quantidade']}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-gray-500">
+                    Não há dados suficientes para exibir este gráfico
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -537,67 +579,79 @@ const Dashboard = ({ onLogout }) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <div>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart outerRadius={80} data={dadosJSON.dadosCategoria}>
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="categoria" />
-                    <PolarRadiusAxis angle={30} domain={[0, 5]} />
-                    <Radar name="Média" dataKey="media" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
-                    <Tooltip formatter={formatarMedia} />
-                    <Legend />
-                  </RadarChart>
-                </ResponsiveContainer>
+                {dadosCategoria.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart outerRadius={80} data={dadosCategoria}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="categoria" />
+                      <PolarRadiusAxis angle={30} domain={[0, 5]} />
+                      <Radar name="Média" dataKey="media" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                      <Tooltip formatter={formatarMedia} />
+                      <Legend />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-gray-500">
+                    Não há categorias para exibir neste gráfico
+                  </div>
+                )}
               </div>
             </div>
             
             <div>
               <div className="overflow-x-auto">
-                <table className="min-w-full bg-white">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="py-2 px-4 border-b text-left">Categoria</th>
-                      <th className="py-2 px-4 border-b text-center">Média</th>
-                      <th className="py-2 px-4 border-b text-center">Nível</th>
-                      <th className="py-2 px-4 border-b text-center">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dadosJSON.dadosCategoria
-                      .sort((a, b) => b.media - a.media)
-                      .map((categoria, index) => (
-                      <tr 
-                        key={index} 
-                        className={`${index % 2 === 0 ? 'bg-gray-50' : ''} ${categoriaAtiva === categoria.categoria ? 'bg-blue-50' : ''} hover:bg-gray-100 cursor-pointer`}
-                        onClick={() => setCategoriaAtiva(categoriaAtiva === categoria.categoria ? null : categoria.categoria)}
-                      >
-                        <td className="py-2 px-4 border-b">
-                          <div className="font-semibold">{categoria.categoria}</div>
-                          <div className="text-xs text-gray-500 mt-1">{categoria.qtdPerguntas} perguntas</div>
-                        </td>
-                        <td className="py-2 px-4 border-b text-center font-semibold">{categoria.media.toFixed(2)}</td>
-                        <td className="py-2 px-4 border-b text-center">
-                          <span 
-                            className="inline-block rounded px-2 py-1 text-xs font-semibold text-white"
-                            style={{ backgroundColor: corDoNivel(categoria.nivel) }}
-                          >
-                            {categoria.nivel}
-                          </span>
-                        </td>
-                        <td className="py-2 px-4 border-b text-center">
-                          <button 
-                            className="text-blue-600 hover:text-blue-800 text-sm underline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCategoriaAtiva(categoriaAtiva === categoria.categoria ? null : categoria.categoria);
-                            }}
-                          >
-                            {categoriaAtiva === categoria.categoria ? 'Ocultar' : 'Ver Detalhes'}
-                          </button>
-                        </td>
+                {dadosCategoria.length > 0 ? (
+                  <table className="min-w-full bg-white">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="py-2 px-4 border-b text-left">Categoria</th>
+                        <th className="py-2 px-4 border-b text-center">Média</th>
+                        <th className="py-2 px-4 border-b text-center">Nível</th>
+                        <th className="py-2 px-4 border-b text-center">Ações</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {dadosCategoria
+                        .sort((a, b) => b.media - a.media)
+                        .map((categoria, index) => (
+                        <tr 
+                          key={index} 
+                          className={`${index % 2 === 0 ? 'bg-gray-50' : ''} ${categoriaAtiva === categoria.categoria ? 'bg-blue-50' : ''} hover:bg-gray-100 cursor-pointer`}
+                          onClick={() => setCategoriaAtiva(categoriaAtiva === categoria.categoria ? null : categoria.categoria)}
+                        >
+                          <td className="py-2 px-4 border-b">
+                            <div className="font-semibold">{categoria.categoria}</div>
+                            <div className="text-xs text-gray-500 mt-1">{categoria.qtdPerguntas || 0} perguntas</div>
+                          </td>
+                          <td className="py-2 px-4 border-b text-center font-semibold">{categoria.media?.toFixed(2) || "N/A"}</td>
+                          <td className="py-2 px-4 border-b text-center">
+                            <span 
+                              className="inline-block rounded px-2 py-1 text-xs font-semibold text-white"
+                              style={{ backgroundColor: corDoNivel(categoria.nivel) }}
+                            >
+                              {categoria.nivel || "N/A"}
+                            </span>
+                          </td>
+                          <td className="py-2 px-4 border-b text-center">
+                            <button 
+                              className="text-blue-600 hover:text-blue-800 text-sm underline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCategoriaAtiva(categoriaAtiva === categoria.categoria ? null : categoria.categoria);
+                              }}
+                            >
+                              {categoriaAtiva === categoria.categoria ? 'Ocultar' : 'Ver Detalhes'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    Não há categorias para exibir
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -606,16 +660,22 @@ const Dashboard = ({ onLogout }) => {
           <div className="mt-8">
             <h3 className="font-bold text-lg mb-3">O que significa cada categoria?</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {dadosJSON.dadosCategoria.map((categoria, index) => (
-                <div 
-                  key={index} 
-                  className="p-4 rounded-lg shadow-sm border-l-4"
-                  style={{ borderLeftColor: corDoNivel(categoria.nivel) }}
-                >
-                  <h4 className="font-semibold text-lg">{categoria.categoria}</h4>
-                  <p className="text-sm text-gray-600 mt-1">{categoria.descricao}</p>
+              {dadosCategoria.length > 0 ? (
+                dadosCategoria.map((categoria, index) => (
+                  <div 
+                    key={index} 
+                    className="p-4 rounded-lg shadow-sm border-l-4"
+                    style={{ borderLeftColor: corDoNivel(categoria.nivel) }}
+                  >
+                    <h4 className="font-semibold text-lg">{categoria.categoria}</h4>
+                    <p className="text-sm text-gray-600 mt-1">{categoria.descricao || "Sem descrição disponível"}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-3 text-center py-4 text-gray-500">
+                  Não há categorias para exibir
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
@@ -628,25 +688,35 @@ const Dashboard = ({ onLogout }) => {
             </h2>
             
             {(() => {
-              const categoria = dadosJSON.dadosCategoria.find(c => c.categoria === categoriaAtiva);
-              if (!categoria) return null;
+              const categoria = dadosCategoria.find(c => c.categoria === categoriaAtiva);
+              if (!categoria) return (
+                <div className="text-center py-4 text-gray-500">
+                  Categoria não encontrada ou sem dados
+                </div>
+              );
               
-              const perguntasCategoria = dadosJSON.todasPerguntas
-                .filter(p => categoria.perguntas.includes(p.pergunta))
+              const perguntasCategoria = todasPerguntas
+                .filter(p => categoria.perguntas && categoria.perguntas.includes(p.pergunta))
                 .sort((a, b) => b.media - a.media);
+              
+              if (!perguntasCategoria.length) return (
+                <div className="text-center py-4 text-gray-500">
+                  Não há perguntas associadas a esta categoria
+                </div>
+              );
               
               return (
                 <div>
                   <div className="mb-6">
                     <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="mb-2"><span className="font-semibold">Descrição:</span> {categoria.descricao}</p>
+                      <p className="mb-2"><span className="font-semibold">Descrição:</span> {categoria.descricao || "Sem descrição disponível"}</p>
                       <div className="flex items-center mt-2">
                         <span className="font-semibold mr-2">Nível geral da categoria:</span>
                         <span 
                           className="inline-block rounded px-2 py-1 text-sm font-semibold text-white"
                           style={{ backgroundColor: corDoNivel(categoria.nivel) }}
                         >
-                          {categoria.nivel} ({categoria.media.toFixed(2)})
+                          {categoria.nivel} ({categoria.media?.toFixed(2) || "N/A"})
                         </span>
                       </div>
                     </div>
@@ -692,36 +762,42 @@ const Dashboard = ({ onLogout }) => {
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">Top 5 Áreas Mais Críticas</h2>
           <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={dadosJSON.perguntasCriticas}
-                layout="vertical"
-                margin={{ top: 20, right: 30, left: 20, bottom: 10 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" domain={[0, 5]} />
-                <YAxis dataKey="perguntaResumida" type="category" width={350} tick={{ fontSize: 12 }} />
-                <Tooltip 
-                  formatter={(value) => [value.toFixed(2), 'Média']}
-                  labelFormatter={(label) => {
-                    const pergunta = dadosJSON.perguntasCriticas.find(p => p.perguntaResumida === label);
-                    return pergunta ? pergunta.pergunta : label;
-                  }}
-                />
-                <Legend />
-                <Bar 
-                  dataKey="media" 
-                  fill="#FF8042" 
-                  name="Média" 
-                  barSize={30}
-                  label={{ position: 'right', formatter: (val) => val.toFixed(2) }}
+            {dadosJSON.perguntasCriticas && dadosJSON.perguntasCriticas.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={dadosJSON.perguntasCriticas}
+                  layout="vertical"
+                  margin={{ top: 20, right: 30, left: 20, bottom: 10 }}
                 >
-                  {dadosJSON.perguntasCriticas.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={corDoNivel(entry.nivel)} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" domain={[0, 5]} />
+                  <YAxis dataKey="perguntaResumida" type="category" width={350} tick={{ fontSize: 12 }} />
+                  <Tooltip 
+                    formatter={(value) => [value.toFixed(2), 'Média']}
+                    labelFormatter={(label) => {
+                      const pergunta = dadosJSON.perguntasCriticas.find(p => p.perguntaResumida === label);
+                      return pergunta ? pergunta.pergunta : label;
+                    }}
+                  />
+                  <Legend />
+                  <Bar 
+                    dataKey="media" 
+                    fill="#FF8042" 
+                    name="Média" 
+                    barSize={30}
+                    label={{ position: 'right', formatter: (val) => val.toFixed(2) }}
+                  >
+                    {dadosJSON.perguntasCriticas.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={corDoNivel(entry.nivel)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-gray-500">
+                Não há dados suficientes para identificar áreas críticas
+              </div>
+            )}
           </div>
         </div>
         
@@ -761,91 +837,115 @@ const Dashboard = ({ onLogout }) => {
               <div>
                 <h3 className="text-lg font-semibold mb-4">Top 5 Piores Avaliações por Setor</h3>
                 
-                <div className="space-y-8">
-                  {Object.entries(dadosPorSetor).map(([setor, dados]) => (
-                    <div key={setor} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="text-lg font-bold text-gray-800">{setor}</h4>
-                        <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">
-                          {dados.totalRespondentes} respondente{dados.totalRespondentes !== 1 ? 's' : ''}
-                        </span>
+                {Object.keys(dadosPorSetor).length > 0 ? (
+                  <div className="space-y-8">
+                    {Object.entries(dadosPorSetor).map(([setor, dados]) => (
+                      <div key={setor} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-lg font-bold text-gray-800">{setor}</h4>
+                          <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">
+                            {dados.totalRespondentes} respondente{dados.totalRespondentes !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        
+                        {dados.pioresPerguntas && dados.pioresPerguntas.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pergunta</th>
+                                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Média</th>
+                                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Nível</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {dados.pioresPerguntas.map((item, idx) => (
+                                  <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                    <td className="px-3 py-2 text-sm text-gray-900" title={item.pergunta}>{item.perguntaResumida}</td>
+                                    <td className="px-3 py-2 text-sm text-center font-medium">{item.media.toFixed(2)}</td>
+                                    <td className="px-3 py-2 text-sm text-center">
+                                      <span 
+                                        className="inline-block rounded px-2 py-1 text-xs font-semibold text-white"
+                                        style={{ backgroundColor: corDoNivel(item.nivel) }}
+                                      >
+                                        {item.nivel}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="text-center py-2 text-gray-500">
+                            Não há dados suficientes para análise deste setor
+                          </div>
+                        )}
                       </div>
-                      
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pergunta</th>
-                              <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Média</th>
-                              <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Nível</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {dados.pioresPerguntas.map((item, idx) => (
-                              <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                <td className="px-3 py-2 text-sm text-gray-900" title={item.pergunta}>{item.perguntaResumida}</td>
-                                <td className="px-3 py-2 text-sm text-center font-medium">{item.media.toFixed(2)}</td>
-                                <td className="px-3 py-2 text-sm text-center">
-                                  <span 
-                                    className="inline-block rounded px-2 py-1 text-xs font-semibold text-white"
-                                    style={{ backgroundColor: corDoNivel(item.nivel) }}
-                                  >
-                                    {item.nivel}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    Não há dados de setores para analisar
+                  </div>
+                )}
               </div>
             ) : (
               <div>
                 <h3 className="text-lg font-semibold mb-4">Top 5 Piores Avaliações por Cargo/Função</h3>
                 
-                <div className="space-y-8">
-                  {Object.entries(dadosPorCargo).map(([cargo, dados]) => (
-                    <div key={cargo} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="text-lg font-bold text-gray-800">{cargo}</h4>
-                        <span className="bg-purple-100 text-purple-800 text-xs font-semibold px-2.5 py-0.5 rounded">
-                          {dados.totalRespondentes} respondente{dados.totalRespondentes !== 1 ? 's' : ''}
-                        </span>
+                {Object.keys(dadosPorCargo).length > 0 ? (
+                  <div className="space-y-8">
+                    {Object.entries(dadosPorCargo).map(([cargo, dados]) => (
+                      <div key={cargo} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-lg font-bold text-gray-800">{cargo}</h4>
+                          <span className="bg-purple-100 text-purple-800 text-xs font-semibold px-2.5 py-0.5 rounded">
+                            {dados.totalRespondentes} respondente{dados.totalRespondentes !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        
+                        {dados.pioresPerguntas && dados.pioresPerguntas.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pergunta</th>
+                                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Média</th>
+                                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Nível</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {dados.pioresPerguntas.map((item, idx) => (
+                                  <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                    <td className="px-3 py-2 text-sm text-gray-900" title={item.pergunta}>{item.perguntaResumida}</td>
+                                    <td className="px-3 py-2 text-sm text-center font-medium">{item.media.toFixed(2)}</td>
+                                    <td className="px-3 py-2 text-sm text-center">
+                                      <span 
+                                        className="inline-block rounded px-2 py-1 text-xs font-semibold text-white"
+                                        style={{ backgroundColor: corDoNivel(item.nivel) }}
+                                      >
+                                        {item.nivel}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="text-center py-2 text-gray-500">
+                            Não há dados suficientes para análise deste cargo
+                          </div>
+                        )}
                       </div>
-                      
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pergunta</th>
-                              <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Média</th>
-                              <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Nível</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {dados.pioresPerguntas.map((item, idx) => (
-                              <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                <td className="px-3 py-2 text-sm text-gray-900" title={item.pergunta}>{item.perguntaResumida}</td>
-                                <td className="px-3 py-2 text-sm text-center font-medium">{item.media.toFixed(2)}</td>
-                                <td className="px-3 py-2 text-sm text-center">
-                                  <span 
-                                    className="inline-block rounded px-2 py-1 text-xs font-semibold text-white"
-                                    style={{ backgroundColor: corDoNivel(item.nivel) }}
-                                  >
-                                    {item.nivel}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    Não há dados de cargos para analisar
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -875,33 +975,39 @@ const Dashboard = ({ onLogout }) => {
           </div>
           
           <div className="overflow-x-auto mb-4">
-            <table className="min-w-full bg-white">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="py-2 px-4 border-b text-left">Pergunta</th>
-                  <th className="py-2 px-4 border-b text-center">Média</th>
-                  <th className="py-2 px-4 border-b text-center">Nível</th>
-                </tr>
-              </thead>
-              <tbody>
-                {perguntasExibidas.map((pergunta, index) => (
-                  <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
-                    <td className="py-2 px-4 border-b">
-                      {pergunta.pergunta}
-                    </td>
-                    <td className="py-2 px-4 border-b text-center font-bold">{pergunta.media.toFixed(2)}</td>
-                    <td className="py-2 px-4 border-b text-center">
-                      <span 
-                        className="inline-block rounded px-2 py-1 text-xs font-semibold text-white"
-                        style={{ backgroundColor: corDoNivel(pergunta.nivel) }}
-                      >
-                        {pergunta.nivel}
-                      </span>
-                    </td>
+            {perguntasExibidas.length > 0 ? (
+              <table className="min-w-full bg-white">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="py-2 px-4 border-b text-left">Pergunta</th>
+                    <th className="py-2 px-4 border-b text-center">Média</th>
+                    <th className="py-2 px-4 border-b text-center">Nível</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {perguntasExibidas.map((pergunta, index) => (
+                    <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                      <td className="py-2 px-4 border-b">
+                        {pergunta.pergunta}
+                      </td>
+                      <td className="py-2 px-4 border-b text-center font-bold">{pergunta.media.toFixed(2)}</td>
+                      <td className="py-2 px-4 border-b text-center">
+                        <span 
+                          className="inline-block rounded px-2 py-1 text-xs font-semibold text-white"
+                          style={{ backgroundColor: corDoNivel(pergunta.nivel) }}
+                        >
+                          {pergunta.nivel}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                Não há perguntas para exibir
+              </div>
+            )}
           </div>
           
           {perguntasFiltradas.length > perguntasVisiveis && (
@@ -923,50 +1029,62 @@ const Dashboard = ({ onLogout }) => {
           <div className="bg-white shadow rounded-lg p-6">
             <h2 className="text-xl font-bold mb-4">Distribuição por Função</h2>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={dadosJSON.dadosFuncoes}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    label={({ name, percent }) => `${name.length > 15 ? name.substring(0, 15) + '...' : name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {dadosJSON.dadosFuncoes.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value, name, props) => [value, props.payload.name]} />
-                </PieChart>
-              </ResponsiveContainer>
+              {dadosJSON.dadosFuncoes && dadosJSON.dadosFuncoes.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={dadosJSON.dadosFuncoes}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={true}
+                      label={({ name, percent }) => `${name && name.length > 15 ? name.substring(0, 15) + '...' : name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {dadosJSON.dadosFuncoes.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value, name, props) => [value, props.payload.name]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-gray-500">
+                  Não há dados sobre funções para exibir
+                </div>
+              )}
             </div>
           </div>
           
           <div className="bg-white shadow rounded-lg p-6">
             <h2 className="text-xl font-bold mb-4">Distribuição por Setor</h2>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={dadosJSON.dadosSetores}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    label={({ name, percent }) => `${name.length > 15 ? name.substring(0, 15) + '...' : name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {dadosJSON.dadosSetores.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value, name, props) => [value, props.payload.name]} />
-                </PieChart>
-              </ResponsiveContainer>
+              {dadosJSON.dadosSetores && dadosJSON.dadosSetores.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={dadosJSON.dadosSetores}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={true}
+                      label={({ name, percent }) => `${name && name.length > 15 ? name.substring(0, 15) + '...' : name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {dadosJSON.dadosSetores.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value, name, props) => [value, props.payload.name]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-gray-500">
+                  Não há dados sobre setores para exibir
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -979,8 +1097,8 @@ const Dashboard = ({ onLogout }) => {
             <div>
               <h3 className="font-bold text-lg text-blue-700 mb-2">Visão Geral</h3>
               <p>
-                A avaliação psicossocial apresenta um resultado geral de <span className="font-bold">{dadosJSON.mediaGeral.toFixed(2)}</span>, o que indica um nível 
-                <span className="font-bold text-orange-600"> {determinarNivel(dadosJSON.mediaGeral)} </span> 
+                A avaliação psicossocial apresenta um resultado geral de <span className="font-bold">{dadosJSON.mediaGeral?.toFixed(2) || "N/A"}</span>, o que indica um nível 
+                <span className="font-bold text-orange-600"> {dadosJSON.mediaGeral ? determinarNivel(dadosJSON.mediaGeral) : "N/A"} </span> 
                 de fatores psicossociais que podem impactar a saúde e bem-estar dos colaboradores. 
                 Este resultado sugere que, embora existam pontos de atenção, a organização mantém um ambiente razoavelmente equilibrado.
               </p>
@@ -988,36 +1106,51 @@ const Dashboard = ({ onLogout }) => {
             
             <div>
               <h3 className="font-bold text-lg text-red-700 mb-2">Pontos de Atenção Prioritária</h3>
-              <ul className="list-disc pl-5">
-                {dadosJSON.perguntasCriticas.slice(0, 3).map((item, index) => (
-                  <li key={index} className="mb-1">
-                    <span className="font-semibold">{item.pergunta}</span>
-                    <span className="ml-2 text-red-600 font-bold">({item.media.toFixed(2)})</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2">
-                Estes itens apresentam médias elevadas e requerem atenção prioritária para melhorar o ambiente psicossocial.
-              </p>
+              {dadosJSON.perguntasCriticas && dadosJSON.perguntasCriticas.length > 0 ? (
+                <>
+                  <ul className="list-disc pl-5">
+                    {dadosJSON.perguntasCriticas.slice(0, 3).map((item, index) => (
+                      <li key={index} className="mb-1">
+                        <span className="font-semibold">{item.pergunta}</span>
+                        <span className="ml-2 text-red-600 font-bold">({item.media.toFixed(2)})</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2">
+                    Estes itens apresentam médias elevadas e requerem atenção prioritária para melhorar o ambiente psicossocial.
+                  </p>
+                </>
+              ) : (
+                <p>Não foram identificados pontos críticos específicos com os dados atuais.</p>
+              )}
             </div>
             
             <div>
               <h3 className="font-bold text-lg text-green-700 mb-2">Pontos Fortes</h3>
-              <p>
-                A dimensão <span className="font-bold">{categoriaMenorMedia.categoria}</span> apresenta a menor pontuação média ({categoriaMenorMedia.media.toFixed(2)}), 
-                indicando uma área onde a organização apresenta melhores práticas.
-              </p>
-              <p className="mt-2">
-                Os seguintes itens apresentaram as menores médias, representando pontos positivos:
-              </p>
-              <ul className="list-disc pl-5 mt-1">
-                {perguntasMenorMedia.map((item, index) => (
-                  <li key={index} className="mb-1">
-                    <span className="font-semibold">{item.pergunta}</span>
-                    <span className="ml-2 text-green-600 font-bold">({item.media.toFixed(2)})</span>
-                  </li>
-                ))}
-              </ul>
+              {categoriaMenorMedia ? (
+                <p>
+                  A dimensão <span className="font-bold">{categoriaMenorMedia.categoria}</span> apresenta a menor pontuação média ({categoriaMenorMedia.media.toFixed(2)}), 
+                  indicando uma área onde a organização apresenta melhores práticas.
+                </p>
+              ) : (
+                <p>Não foi possível identificar pontos fortes específicos com os dados atuais.</p>
+              )}
+              
+              {perguntasMenorMedia.length > 0 ? (
+                <>
+                  <p className="mt-2">
+                    Os seguintes itens apresentaram as menores médias, representando pontos positivos:
+                  </p>
+                  <ul className="list-disc pl-5 mt-1">
+                    {perguntasMenorMedia.map((item, index) => (
+                      <li key={index} className="mb-1">
+                        <span className="font-semibold">{item.pergunta}</span>
+                        <span className="ml-2 text-green-600 font-bold">({item.media.toFixed(2)})</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
             </div>
             
             <div>
@@ -1066,7 +1199,7 @@ const Dashboard = ({ onLogout }) => {
         
         <footer className="text-center text-gray-500 text-sm mt-10 mb-6">
           <p>Dashboard de Mapeamento de Fatores Psicossociais - {new Date().toLocaleDateString()}</p>
-          <p>Total de respondentes: {dadosJSON.totalRespondentes} | Total de perguntas analisadas: {dadosJSON.todasPerguntas.length}</p>
+          <p>Total de respondentes: {dadosJSON.totalRespondentes || 0} | Total de perguntas analisadas: {todasPerguntas.length}</p>
           <p className="mt-2">Desenvolvido por <a href="https://www.grsnucleo.com.br/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">GRS+Núcleo</a></p>
         </footer>
       </div>

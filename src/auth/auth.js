@@ -42,8 +42,13 @@ export const login = (user, key) => {
 };
 
 export const logout = () => {
-  localStorage.removeItem('auth');
-  return true;
+  try {
+    localStorage.removeItem('auth');
+    return true;
+  } catch (error) {
+    console.error('Erro ao fazer logout:', error);
+    return false;
+  }
 };
 
 export const getAuth = () => {
