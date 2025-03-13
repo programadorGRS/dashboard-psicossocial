@@ -22,7 +22,7 @@ function App() {
     return () => clearInterval(interval);
   }, []);
   
-  const handleLoginSuccess = (userData) => {
+  const handleLoginSuccess = () => {
     setIsAuthenticated(true);
   };
   

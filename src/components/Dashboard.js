@@ -152,7 +152,6 @@ const Dashboard = ({ onLogout }) => {
   // Formatador para tooltips
   const formatarMedia = (value) => [value.toFixed(2), 'Média'];
   
-  // Componente de Modal para Upload
   const ModalUpload = () => {
     if (!exibirModalUpload) return null;
     
@@ -168,17 +167,6 @@ const Dashboard = ({ onLogout }) => {
               type="file" 
               accept=".xlsx, .xls" 
               onChange={handleUploadArquivo}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-          
-          <div className="mb-6 border-t pt-4">
-            <h4 className="font-semibold mb-2">Importar Dados JSON</h4>
-            <p className="text-sm text-gray-600 mb-2">Alternativamente, você pode importar dados de um arquivo JSON exportado anteriormente.</p>
-            <input 
-              type="file" 
-              accept=".json" 
-              onChange={handleImportarDados}
               className="w-full p-2 border rounded"
             />
           </div>
@@ -400,31 +388,24 @@ const Dashboard = ({ onLogout }) => {
           </a>
           
           <div className="flex items-center space-x-4">
-            <div className="text-sm text-gray-500">
-              Última atualização: {dataAtualizacao.toLocaleDateString()} às {dataAtualizacao.toLocaleTimeString()}
-            </div>
+          <div className="text-sm text-gray-500">
+            Última atualização: {dataAtualizacao.toLocaleDateString()} às {dataAtualizacao.toLocaleTimeString()}
+          </div>
             
-            <div className="flex space-x-2">
-              <button 
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                onClick={() => setExibirModalUpload(true)}
-              >
-                Atualizar
-              </button>
+          <div className="flex space-x-2">
+          <button 
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            onClick={() => setExibirModalUpload(true)}
+          >
+            Atualizar
+          </button>
               
-              <button 
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                onClick={handleExportarDados}
-              >
-                Exportar
-              </button>
-              
-              <button 
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-                onClick={() => setExibirLogs(!exibirLogs)}
-              >
-                {exibirLogs ? 'Ocultar Logs' : 'Ver Logs'}
-              </button>
+          <button 
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            onClick={handleExportarDados}
+          >
+            Exportar
+          </button>
               
               <button 
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"

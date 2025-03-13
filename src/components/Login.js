@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { login } from '../auth/auth';
 
 const Login = ({ onLoginSuccess }) => {
-  const [user, setUser] = useState('');
   const [key, setKey] = useState('');
   const [error, setError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -13,18 +12,18 @@ const Login = ({ onLoginSuccess }) => {
     setIsLoggingIn(true);
     
     try {
-      if (!user || !key) {
-        setError('Preencha todos os campos');
+      if (!key) {
+        setError('Por favor, digite a chave de acesso');
         setIsLoggingIn(false);
         return;
       }
       
-      const userData = login(user, key);
+      const userData = login(key);
       
       if (userData) {
         onLoginSuccess(userData);
       } else {
-        setError('Usuário ou chave secreta inválidos');
+        setError('Chave de acesso inválida');
       }
     } catch (error) {
       console.error("Erro no login:", error);
@@ -50,26 +49,9 @@ const Login = ({ onLoginSuccess }) => {
         )}
         
         <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="user">
-              Usuário
-            </label>
-            <select
-              id="user"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={user}
-              onChange={(e) => setUser(e.target.value)}
-              required
-            >
-              <option value="">Selecione o usuário</option>
-              <option value="admin">Administrador</option>
-              <option value="cliente">Cliente</option>
-            </select>
-          </div>
-          
           <div className="mb-6">
             <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="key">
-              Chave Secreta
+              Chave de Acesso
             </label>
             <input
               id="key"
@@ -77,7 +59,7 @@ const Login = ({ onLoginSuccess }) => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={key}
               onChange={(e) => setKey(e.target.value)}
-              placeholder="Digite a chave secreta"
+              placeholder="Digite a chave de acesso"
               required
             />
           </div>
