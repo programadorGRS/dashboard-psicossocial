@@ -10,17 +10,7 @@ Este projeto foi desenvolvido pela GRS+Núcleo para visualização e análise de
 - Exportação e importação de dados
 - Histórico de logs de sistema
 - Autenticação básica
-
-## Credenciais de Acesso
-
-- Administrador: 
-  - Usuário: admin
-  - Chave: @Grs2025@
-
-- Cliente: 
-  - Usuário: cliente
-  - Chave: grscliente
-
+  
 ## Tecnologias Utilizadas
 
 - React.js
