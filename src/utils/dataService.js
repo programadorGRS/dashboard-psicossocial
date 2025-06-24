@@ -1,7 +1,6 @@
 import * as XLSX from 'xlsx';
 import _ from 'lodash';
 
-// Função para determinar nível de risco com base na média
 export const determinarNivel = (media) => {
   if (media <= 2) return "Baixo";
   if (media <= 2.5) return "Moderado Baixo";
@@ -10,7 +9,6 @@ export const determinarNivel = (media) => {
   return "Alto";
 };
 
-// Função para salvar dados 
 export const salvarDados = (dados) => {
   try {
     localStorage.setItem('dashboardData', JSON.stringify(dados));
@@ -21,11 +19,19 @@ export const salvarDados = (dados) => {
   }
 };
 
-// Função para processar o arquivo XLSX e gerar o JSON
+const extrairNumero = (valor) => {
+  if (typeof valor === 'number') return valor;
+  if (typeof valor === 'string') {
+    const match = valor.match(/\d+/);
+    return match ? Number(match[0]) : null;
+  }
+  return null;
+};
+
 export const processarArquivoXLSX = (arquivo) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target.result);
@@ -36,114 +42,105 @@ export const processarArquivoXLSX = (arquivo) => {
           cellNF: true,
           sheetStubs: true
         });
-        
-        // Usar a primeira planilha
+
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        
-        // Verificar se temos dados
+
         if (!jsonData || jsonData.length === 0) {
           throw new Error("Nenhum dado encontrado na planilha.");
         }
-        
-        // Extrair funções e setores
+
         const funcoes = _.countBy(jsonData, 'Qual sua função?');
         const setores = _.countBy(jsonData, 'Qual seu setor?');
-        
-        // Identificar perguntas de avaliação
-        const perguntas = Object.keys(jsonData[0]).filter(key => 
-          key !== 'ID' && 
-          key !== 'Hora de início' && 
-          key !== 'Hora de conclusão' && 
-          key !== 'Email' && 
-          key !== 'Nome' &&
-          key !== 'Hora da última modificação' &&
-          key !== 'Qual sua função?' && 
-          key !== 'Qual seu setor?'
+
+        const perguntas = Object.keys(jsonData[0]).filter(key =>
+          ![
+            'ID', 'Hora de início', 'Hora de conclusão', 'Email', 'Nome',
+            'Hora da última modificação', 'Qual sua função?', 'Qual seu setor?'
+          ].includes(key)
         );
-        
-        // Calcular médias por pergunta
+
         const mediasPorPergunta = {};
         perguntas.forEach(pergunta => {
-          const valores = jsonData.map(item => item[pergunta]).filter(val => val !== undefined && val !== null);
+          const valores = jsonData
+            .map(item => extrairNumero(item[pergunta]))
+            .filter(val => val !== null);
           mediasPorPergunta[pergunta] = _.mean(valores);
         });
-        
-        // Definir categorias e suas descrições
+
         const categoriasConfig = {
           'Demandas': {
-            descricao: 'Abrange aspectos como carga de trabalho, intensidade, velocidade, pausas e prazos. Reflete o quanto as exigências de trabalho podem estar impactando o colaborador.',
+            descricao: 'Abrange aspectos como carga de trabalho, intensidade, velocidade, pausas e prazos.',
             keywords: ['prazos', 'intensamente', 'muita coisa', 'rapidez', 'muita rapidez', 'pausas', 'pressão']
           },
           'Relacionamentos': {
-            descricao: 'Compreende a qualidade das interações interpessoais no ambiente de trabalho, incluindo conflitos, respeito e comunicação entre colegas.',
+            descricao: 'Compreende a qualidade das interações interpessoais no ambiente de trabalho.',
             keywords: ['conflitos', 'perseguido', 'tensas', 'dura', 'respeito', 'comportam']
           },
           'Controle': {
-            descricao: 'Refere-se ao nível de autonomia, participação nas decisões e flexibilidade que o colaborador possui sobre seu próprio trabalho.',
+            descricao: 'Refere-se ao nível de autonomia e participação nas decisões.',
             keywords: ['decidir', 'escolha', 'pausa', 'liberdade', 'sugestões', 'opinião', 'flexível']
           },
           'Apoio': {
-            descricao: 'Relaciona-se ao suporte oferecido por colegas e gestores, incluindo confiança, incentivo e disponibilidade para ajuda.',
+            descricao: 'Relaciona-se ao suporte de colegas e gestores.',
             keywords: ['suporte', 'confiar', 'apoio', 'ajuda', 'escutar', 'informações', 'incentivo']
           },
           'Clareza': {
-            descricao: 'Avalia o quanto as expectativas, responsabilidades e objetivos estão bem definidos e compreendidos pelo colaborador.',
+            descricao: 'Avalia se responsabilidades e metas estão claras.',
             keywords: ['clareza', 'direcionamento', 'objetivos', 'explicações', 'metas', 'espera', 'encaixa', 'tarefas', 'responsabilidades']
           },
           'Mudanças': {
-            descricao: 'Avalia como as mudanças organizacionais são comunicadas e implementadas, e como os colaboradores são envolvidos nesse processo.',
+            descricao: 'Avalia comunicação e envolvimento em mudanças organizacionais.',
             keywords: ['mudanças', 'consultadas']
           }
         };
-        
-        // Criar categorias com suas perguntas associadas
+
         const categorias = {};
         Object.entries(categoriasConfig).forEach(([categoria, config]) => {
           categorias[categoria] = {
             descricao: config.descricao,
-            perguntas: perguntas.filter(p => 
+            perguntas: perguntas.filter(p =>
               config.keywords.some(keyword => p.toLowerCase().includes(keyword.toLowerCase()))
             )
           };
         });
-        
-        // Calcular médias por categoria
+
         const mediasPorCategoria = {};
         const dadosCategoria = [];
-        
+
         for (const [categoria, dadosCateg] of Object.entries(categorias)) {
           const perguntasCategoria = dadosCateg.perguntas;
           const todasRespostas = [];
-          
+
           perguntasCategoria.forEach(pergunta => {
-            const valores = jsonData.map(item => item[pergunta]).filter(val => val !== undefined && val !== null);
+            const valores = jsonData
+              .map(item => extrairNumero(item[pergunta]))
+              .filter(val => val !== null);
             todasRespostas.push(...valores);
           });
-          
+
           const media = todasRespostas.length > 0 ? _.mean(todasRespostas) : 0;
           mediasPorCategoria[categoria] = media;
-          
+
           dadosCategoria.push({
-            categoria: categoria,
+            categoria,
             descricao: dadosCateg.descricao,
-            media: media,
+            media,
             nivel: determinarNivel(media),
             qtdPerguntas: perguntasCategoria.length,
             perguntas: perguntasCategoria
           });
         }
-        
-        // Formatar dados para gráficos
+
         const dadosPerguntas = Object.entries(mediasPorPergunta)
           .map(([pergunta, media]) => ({
-            pergunta: pergunta,
+            pergunta,
             perguntaResumida: pergunta.substring(0, 50) + (pergunta.length > 50 ? '...' : ''),
-            media: media,
+            media,
             nivel: determinarNivel(media)
           }))
           .sort((a, b) => b.media - a.media);
-        
+
         const dadosFuncoes = Object.entries(funcoes).map(([funcao, quantidade]) => ({
           name: funcao,
           value: quantidade
@@ -153,14 +150,10 @@ export const processarArquivoXLSX = (arquivo) => {
           name: setor,
           value: quantidade
         }));
-        
-        // Top 5 perguntas mais críticas
+
         const perguntasCriticas = dadosPerguntas.slice(0, 5);
-        
-        // Calcular média geral de todas as perguntas
         const mediaGeral = _.mean(Object.values(mediasPorPergunta));
-        
-        // Criar o objeto JSON final
+
         const dadosProcessados = {
           totalRespondentes: jsonData.length,
           dadosFuncoes,
@@ -178,27 +171,24 @@ export const processarArquivoXLSX = (arquivo) => {
           nomeArquivo: arquivo.name,
           dadosOriginais: jsonData
         };
-        
-        // Salvar dados
+
         salvarDados(dadosProcessados);
-        
         resolve(dadosProcessados);
       } catch (error) {
         console.error("Erro ao processar arquivo:", error);
         reject(error);
       }
     };
-    
+
     reader.onerror = (error) => {
       console.error("Erro ao ler arquivo:", error);
       reject(new Error("Erro ao ler o arquivo."));
     };
-    
+
     reader.readAsArrayBuffer(arquivo);
   });
 };
 
-// Função para carregar dados
 export const carregarDados = () => {
   try {
     const dados = localStorage.getItem('dashboardData');
@@ -209,38 +199,27 @@ export const carregarDados = () => {
   }
 };
 
-// Função para exportar dados atuais
 export const exportarDados = () => {
   try {
     const dados = localStorage.getItem('dashboardData');
-    
-    if (!dados) {
-      throw new Error("Nenhum dado disponível para exportação.");
-    }
-    
-    // Criar nome de arquivo com data atual
+    if (!dados) throw new Error("Nenhum dado disponível para exportação.");
+
     const date = new Date().toISOString().split('T')[0];
     const filename = `dashboard_dados_${date}.json`;
-    
-    // Criar blob com dados
     const blob = new Blob([dados], { type: 'application/json' });
-    
-    // Criar URL para download
     const url = URL.createObjectURL(blob);
-    
-    // Criar link de download
+
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
-    
-    // Limpar
+
     setTimeout(() => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }, 0);
-    
+
     return true;
   } catch (error) {
     console.error("Erro ao exportar dados:", error);
