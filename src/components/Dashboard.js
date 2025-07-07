@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from 'recharts';
 import _ from 'lodash';
 import { getAuth, logout } from '../auth/auth';
-import { processarArquivoXLSX, salvarDados, carregarDados, exportarDados, determinarNivel } from '../utils/dataService';
+import { processarArquivoXLSX, salvarDados, carregarDados, exportarDados, determinarNivel, extrairNumero } from '../utils/dataService';
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#FF6B6B', '#4ECDC4'];
 const NIVEL_CORES = ['#00C49F', '#82ca9d', '#FFBB28', '#FF8042', '#FF0000'];
 
 const Dashboard = ({ onLogout }) => {
@@ -204,6 +204,7 @@ const Dashboard = ({ onLogout }) => {
   
   const perguntasMenorMedia = todasPerguntas.length ? _.sortBy(todasPerguntas, 'media').slice(0, 3) : [];
   
+  // Função corrigida para processar dados por segmento
   const processarDadosPorSegmento = () => {
     if (!dadosJSON.dadosOriginais || !Array.isArray(dadosJSON.dadosOriginais)) {
       return { dadosPorSetor: {}, dadosPorCargo: {} };
@@ -224,8 +225,8 @@ const Dashboard = ({ onLogout }) => {
         
         const pergunta = perguntaObj.pergunta;
         const valores = respostasDoSetor
-          .map(item => item[pergunta])
-          .filter(val => val !== undefined && val !== null);
+          .map(item => extrairNumero(item[pergunta]))
+          .filter(val => val !== null && !isNaN(val));
         
         if (valores.length > 0) {
           mediasPorPergunta[pergunta] = _.mean(valores);
@@ -263,8 +264,8 @@ const Dashboard = ({ onLogout }) => {
         
         const pergunta = perguntaObj.pergunta;
         const valores = respostasDoCargo
-          .map(item => item[pergunta])
-          .filter(val => val !== undefined && val !== null);
+          .map(item => extrairNumero(item[pergunta]))
+          .filter(val => val !== null && !isNaN(val));
         
         if (valores.length > 0) {
           mediasPorPergunta[pergunta] = _.mean(valores);
@@ -315,9 +316,11 @@ const Dashboard = ({ onLogout }) => {
           </a>
           
           <div className="flex items-center space-x-4">
-            <div className="text-sm text-gray-500">
-              Última atualização: {dataAtualizacao.toLocaleDateString()} às {dataAtualizacao.toLocaleTimeString()}
-            </div>
+            {dataAtualizacao && (
+              <div className="text-sm text-gray-500">
+                Última atualização: {dataAtualizacao.toLocaleDateString()} às {dataAtualizacao.toLocaleTimeString()}
+              </div>
+            )}
             
             <div className="flex space-x-2">
               <button 
@@ -894,7 +897,7 @@ const Dashboard = ({ onLogout }) => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-xl font-bold mb-4">Distribuição por Função</h2>
+            <h2 className="text-xl font-bold mb-4">Distribuição por Função (Top 5)</h2>
             <div className="h-64">
               {dadosJSON.dadosFuncoes && dadosJSON.dadosFuncoes.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -925,7 +928,7 @@ const Dashboard = ({ onLogout }) => {
           </div>
           
           <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-xl font-bold mb-4">Distribuição por Setor</h2>
+            <h2 className="text-xl font-bold mb-4">Distribuição por Setor (Top 5)</h2>
             <div className="h-64">
               {dadosJSON.dadosSetores && dadosJSON.dadosSetores.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
