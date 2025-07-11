@@ -17,6 +17,9 @@ const Dashboard = ({ onLogout }) => {
   const [exibirModalUpload, setExibirModalUpload] = useState(false);
   const [usuario, setUsuario] = useState(null);
   const [activeTab, setActiveTab] = useState('setor');
+  const [nomeEmpresa, setNomeEmpresa] = useState('');
+  const [nomeEmpresaTemp, setNomeEmpresaTemp] = useState('');
+  const [arquivoSelecionado, setArquivoSelecionado] = useState(null);
   
   useEffect(() => {
     const auth = getAuth();
@@ -25,22 +28,40 @@ const Dashboard = ({ onLogout }) => {
     }
   }, []);
   
-  const handleUploadArquivo = async (evento) => {
+  const handleSelecionarArquivo = (evento) => {
     const arquivo = evento.target.files[0];
-    if (!arquivo) return;
+    setArquivoSelecionado(arquivo);
+  };
+  
+  const handleProcessarArquivo = async () => {
+    if (!arquivoSelecionado) {
+      setErro("Selecione um arquivo primeiro");
+      return;
+    }
+    
+    if (!nomeEmpresaTemp.trim()) {
+      setErro("Digite o nome da empresa");
+      return;
+    }
     
     setCarregando(true);
     setErro(null);
     
     try {
-      const dadosProcessados = await processarArquivoXLSX(arquivo);
+      const dadosProcessados = await processarArquivoXLSX(arquivoSelecionado);
+      
+      // Adiciona o nome da empresa aos dados
+      dadosProcessados.nomeEmpresa = nomeEmpresaTemp.trim();
       
       setDadosJSON(dadosProcessados);
+      setNomeEmpresa(nomeEmpresaTemp.trim());
       setDataAtualizacao(new Date());
       
       await salvarDados(dadosProcessados);
       
       setExibirModalUpload(false);
+      setArquivoSelecionado(null);
+      setNomeEmpresaTemp('');
       console.log("Arquivo processado com sucesso");
     } catch (error) {
       console.error("Erro ao processar arquivo:", error);
@@ -69,6 +90,13 @@ const Dashboard = ({ onLogout }) => {
     onLogout();
   };
   
+  const handleFecharModal = () => {
+    setExibirModalUpload(false);
+    setArquivoSelecionado(null);
+    setNomeEmpresaTemp('');
+    setErro(null);
+  };
+  
   const corDoNivel = (nivel) => {
     switch(nivel) {
       case "Baixo": return NIVEL_CORES[0];
@@ -87,26 +115,55 @@ const Dashboard = ({ onLogout }) => {
     
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full">
-          <h3 className="text-xl font-bold mb-4">Atualizar Dados</h3>
+        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+          <h3 className="text-xl font-bold mb-4 text-gray-800">Atualizar Dados</h3>
+          
+          {erro && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              {erro}
+            </div>
+          )}
           
           <div className="mb-6">
-            <h4 className="font-semibold mb-2">Carregar Planilha XLSX</h4>
-            <p className="text-sm text-gray-600 mb-2">Selecione um arquivo XLSX com os dados do mapeamento psicossocial.</p>
+            <h4 className="font-semibold mb-2 text-gray-700">Nome da Empresa</h4>
             <input 
-              type="file" 
-              accept=".xlsx, .xls" 
-              onChange={handleUploadArquivo}
-              className="w-full p-2 border rounded"
+              type="text" 
+              placeholder="Digite o nome da empresa..."
+              value={nomeEmpresaTemp}
+              onChange={(e) => setNomeEmpresaTemp(e.target.value)}
+              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           
-          <div className="flex justify-end space-x-2">
+          <div className="mb-6">
+            <h4 className="font-semibold mb-2 text-gray-700">Carregar Planilha XLSX</h4>
+            <p className="text-sm text-gray-600 mb-3">Selecione um arquivo XLSX com os dados do mapeamento psicossocial.</p>
+            <input 
+              type="file" 
+              accept=".xlsx, .xls" 
+              onChange={handleSelecionarArquivo}
+              className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {arquivoSelecionado && (
+              <div className="mt-2 text-sm text-green-600">
+                ✓ Arquivo selecionado: {arquivoSelecionado.name}
+              </div>
+            )}
+          </div>
+          
+          <div className="flex justify-end space-x-3">
             <button 
-              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-              onClick={() => setExibirModalUpload(false)}
+              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
+              onClick={handleFecharModal}
             >
               Cancelar
+            </button>
+            <button 
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleProcessarArquivo}
+              disabled={carregando || !arquivoSelecionado || !nomeEmpresaTemp.trim()}
+            >
+              {carregando ? 'Processando...' : 'Processar Dados'}
             </button>
           </div>
         </div>
@@ -114,10 +171,40 @@ const Dashboard = ({ onLogout }) => {
     );
   };
   
+  // Função para renderizar o header da empresa
+  const renderHeaderEmpresa = () => {
+    if (nomeEmpresa) {
+      return (
+        <div className="flex items-center space-x-3">
+          <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-3 rounded-lg shadow-lg">
+            <div className="text-white font-bold text-xl">
+              {nomeEmpresa}
+            </div>
+            <div className="text-blue-100 text-sm">
+              Dashboard Psicossocial
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <a 
+        href="https://www.grsnucleo.com.br/" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="font-bold text-xl text-blue-800 flex items-center hover:text-blue-600 transition-colors"
+      >
+        GRS+Núcleo
+      </a>
+    );
+  };
+  
   if (carregando) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <h2 className="text-xl font-bold mb-4">Carregando Dados...</h2>
           <p>Processando informações do mapeamento psicossocial</p>
         </div>
@@ -125,7 +212,7 @@ const Dashboard = ({ onLogout }) => {
     );
   }
   
-  if (erro) {
+  if (erro && !exibirModalUpload) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="text-center">
@@ -150,19 +237,12 @@ const Dashboard = ({ onLogout }) => {
           <p className="text-gray-600 mb-6">Carregue uma planilha XLSX para iniciar a análise</p>
           
           <div className="mb-6">
-            <label 
-              htmlFor="upload-xlsx" 
-              className="block w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 cursor-pointer"
+            <button
+              onClick={() => setExibirModalUpload(true)}
+              className="block w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 cursor-pointer transition-colors"
             >
               Carregar Planilha
-              <input 
-                id="upload-xlsx"
-                type="file" 
-                accept=".xlsx, .xls" 
-                onChange={handleUploadArquivo}
-                className="hidden"
-              />
-            </label>
+            </button>
           </div>
           
           <div className="text-sm text-gray-500">
@@ -174,6 +254,7 @@ const Dashboard = ({ onLogout }) => {
             </ul>
           </div>
         </div>
+        <ModalUpload />
       </div>
     );
   }
@@ -306,14 +387,7 @@ const Dashboard = ({ onLogout }) => {
       
       <div className="container mx-auto">
         <div className="flex justify-between items-center mb-4">
-          <a 
-            href="https://www.grsnucleo.com.br/" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="font-bold text-xl text-blue-800 flex items-center"
-          >
-            GRS+Núcleo
-          </a>
+          {renderHeaderEmpresa()}
           
           <div className="flex items-center space-x-4">
             {dataAtualizacao && (
@@ -359,6 +433,11 @@ const Dashboard = ({ onLogout }) => {
         <header className="bg-white shadow rounded-lg p-6 mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Dashboard - Mapeamento de Fatores Psicossociais</h1>
           <p className="text-gray-600">Análise baseada em {dadosJSON.totalRespondentes || 0} respondentes e {todasPerguntas.length} questões avaliadas</p>
+          {nomeEmpresa && (
+            <div className="mt-2 text-sm text-blue-600">
+              Empresa: <span className="font-semibold">{nomeEmpresa}</span>
+            </div>
+          )}
         </header>
         
         <div className="bg-white shadow rounded-lg p-6 mb-6">
