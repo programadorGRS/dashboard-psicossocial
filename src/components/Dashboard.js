@@ -33,6 +33,10 @@ const Dashboard = ({ onLogout }) => {
     setArquivoSelecionado(arquivo);
   };
   
+  const handleNomeEmpresaChange = (evento) => {
+    setNomeEmpresaTemp(evento.target.value);
+  };
+  
   const handleProcessarArquivo = async () => {
     if (!arquivoSelecionado) {
       setErro("Selecione um arquivo primeiro");
@@ -130,7 +134,7 @@ const Dashboard = ({ onLogout }) => {
               type="text" 
               placeholder="Digite o nome da empresa..."
               value={nomeEmpresaTemp}
-              onChange={(e) => setNomeEmpresaTemp(e.target.value)}
+              onChange={handleNomeEmpresaChange}
               className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -175,14 +179,12 @@ const Dashboard = ({ onLogout }) => {
   const renderHeaderEmpresa = () => {
     if (nomeEmpresa) {
       return (
-        <div className="flex items-center space-x-3">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-3 rounded-lg shadow-lg">
-            <div className="text-white font-bold text-xl">
-              {nomeEmpresa}
-            </div>
-            <div className="text-blue-100 text-sm">
-              Dashboard Psicossocial
-            </div>
+        <div className="flex items-center">
+          <div className="text-xl font-bold text-gray-800">
+            {nomeEmpresa}
+          </div>
+          <div className="ml-3 text-sm text-gray-500 border-l pl-3">
+            Dashboard Psicossocial
           </div>
         </div>
       );
